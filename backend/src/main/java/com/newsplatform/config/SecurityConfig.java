@@ -32,27 +32,13 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final TokenService tokenService;
-    private final UserRepository userRepository;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Autowired
     public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
-                         TokenService tokenService,
-                         UserRepository userRepository) {
+                         JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
-        this.tokenService = tokenService;
-        this.userRepository = userRepository;
-    }
-
-    /**
-     * Bean pour le filtre JWT d'authentification
-     * Couche Configuration : Création manuelle du filtre pour éviter les problèmes d'initialisation
-     * 
-     * @return Filtre JWT configuré
-     */
-    @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(tokenService, userRepository);
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     /**
@@ -116,7 +102,7 @@ public class SecurityConfig {
             );
 
         // Ajout du filtre JWT avant le filtre d'authentification par défaut
-        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
