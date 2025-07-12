@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://newsplatform.com/soap/auth"
+           targetNamespace="http://newsplatform.com/soap/auth"
+           elementFormDefault="qualified">
+
+    <!-- Éléments de requête et réponse pour l'authentification -->
+    <xs:element name="loginSoapRequest" type="tns:LoginSoapRequest"/>
+    <xs:element name="loginSoapResponse" type="tns:LoginSoapResponse"/>
+    <xs:element name="logoutSoapRequest" type="tns:LogoutSoapRequest"/>
+    <xs:element name="logoutSoapResponse" type="tns:LogoutSoapResponse"/>
+
+    <!-- Type de données pour la requête de connexion -->
+    <xs:complexType name="LoginSoapRequest">
+        <xs:sequence>
+            <xs:element name="username" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Nom d'utilisateur ou adresse email pour l'authentification</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="password" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Mot de passe en clair (sera chiffré côté serveur)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="clientIp" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Adresse IP du client pour l'audit de sécurité</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="userAgent" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>User-Agent du client pour l'audit de sécurité</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour la réponse de connexion -->
+    <xs:complexType name="LoginSoapResponse">
+        <xs:sequence>
+            <xs:element name="accessToken" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Jeton JWT d'accès pour l'authentification</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="refreshToken" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Jeton de rafraîchissement pour renouveler l'accès</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="expiresIn" type="xs:long" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Durée de validité du jeton d'accès en secondes</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="tokenType" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Type de jeton (Bearer pour JWT)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="userId" type="xs:long" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Identifiant unique de l'utilisateur authentifié</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="username" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Nom d'utilisateur authentifié</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="role" type="tns:UserRole" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Rôle de l'utilisateur dans le système</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="message" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Message informatif sur l'authentification</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour la requête de déconnexion -->
+    <xs:complexType name="LogoutSoapRequest">
+        <xs:sequence>
+            <xs:element name="token" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Jeton JWT à révoquer</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="globalLogout" type="xs:boolean" minOccurs="0" default="false">
+                <xs:annotation>
+                    <xs:documentation>Déconnexion globale (tous les jetons de l'utilisateur)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour la réponse de déconnexion -->
+    <xs:complexType name="LogoutSoapResponse">
+        <xs:sequence>
+            <xs:element name="success" type="xs:boolean" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Indicateur de succès de la déconnexion</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="message" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Message confirmatif de la déconnexion</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="tokensRevoked" type="xs:int" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Nombre de jetons révoqués lors de la déconnexion</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Énumération des rôles utilisateur -->
+    <xs:simpleType name="UserRole">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="VISITEUR">
+                <xs:annotation>
+                    <xs:documentation>Utilisateur avec accès lecture seule</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="EDITEUR">
+                <xs:annotation>
+                    <xs:documentation>Utilisateur avec droits de création et modification d'articles</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="ADMINISTRATEUR">
+                <xs:annotation>
+                    <xs:documentation>Utilisateur avec droits d'administration complète</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema> 

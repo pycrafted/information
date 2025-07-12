@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: news-platform
+  profiles:
+    active: dev
+  
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:newsplatform}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:newsuser}}  
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:G7!pR2@vLq8z}}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Hérite par défaut de datasource mais permet la surcharge via SPRING_FLYWAY_* si nécessaire.
+    url: ${SPRING_FLYWAY_URL:${spring.datasource.url}}
+    user: ${SPRING_FLYWAY_USER:${spring.datasource.username}}
+    password: ${SPRING_FLYWAY_PASSWORD:${spring.datasource.password}}
+  
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=1h
+
+jwt:
+  secret: ${JWT_SECRET:Qw3rT6yU9oP2sV5bX8cZ1aL4dE7gH0jK}
+  expiration: 86400000 # 24 hours
+  refresh-expiration: 604800000 # 7 days
+
+logging:
+  level:
+    com.newsplatform: DEBUG
+    org.springframework.security: DEBUG
+  file:
+    path: ./logs
+
+# Configuration du nettoyage automatique des logs
+app:
+  logs:
+    cleanup:
+      # Active ou désactive le nettoyage automatique des logs au démarrage
+      enabled: true
+      # Archive les logs existants avant suppression (true) ou les supprime directement (false)
+      archive-before-delete: true
+      # Délai en secondes avant le nettoyage pour permettre l'initialisation
+      delay-seconds: 2 

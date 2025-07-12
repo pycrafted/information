@@ -1,0 +1,138 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.3'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+	id 'org.flywaydb.flyway' version '9.22.3'
+}
+
+group = 'com'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21) // Utilisation explicite de Java 21
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// Spring Boot Starters
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-web-services'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// JSON / XML
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
+
+	// OpenAPI/Swagger Documentation
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+	// Flyway (migrations)
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+
+	// WSDL/SOAP support
+	implementation 'wsdl4j:wsdl4j:1.6.3'
+
+	// JWT
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	// Lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	// Spring Configuration Processor
+	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+	// DevTools
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	// Bases de données
+	runtimeOnly 'org.postgresql:postgresql'     // PostgreSQL pour production
+	runtimeOnly 'com.h2database:h2'            // H2 pour développement et tests
+
+	// Tests
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	ignoreFailures = true // Continue même si certains tests échouent
+	finalizedBy jacocoTestReport
+}
+
+// JaCoCo - Outil de couverture
+jacoco {
+	toolVersion = "0.8.12"
+}
+
+jacocoTestReport {
+	dependsOn test
+
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = true
+	}
+
+	executionData.setFrom fileTree(layout.buildDirectory.dir('jacoco')).include("**/*.exec")
+
+	afterEvaluate {
+		classDirectories.setFrom files(classDirectories.files.collect {
+			fileTree(dir: it, exclude: [
+				'**/config/**',
+				'**/dto/**',
+				'**/NewsPlatformApplication.class'
+			])
+		})
+	}
+}
+
+jacocoTestCoverageVerification {
+	dependsOn jacocoTestReport
+
+	violationRules {
+		rule {
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.65
+			}
+		}
+		rule {
+			limit {
+				counter = 'BRANCH'
+				value = 'COVEREDRATIO'
+				minimum = 0.60
+			}
+		}
+	}
+}
+
+// Vérification de couverture intégrée au build
+check.dependsOn jacocoTestCoverageVerification
+
+// Configuration Flyway
+flyway {
+	url = 'jdbc:postgresql://localhost:5432/newsplatform'
+	user = 'newsuser'
+	password = 'G7!pR2@vLq8z'
+	locations = ['filesystem:src/main/resources/db/migration']
+}

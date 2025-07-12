@@ -1,0 +1,30 @@
+# Fichiers de configuration locaux
+.env.local
+.env
+
+# Dépendances
+node_modules/
+/backend/build/
+/desktop-client/build/
+/frontend/dist/
+
+# Fichiers IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Fichiers système
+.DS_Store
+
+# Fichiers de log
+*.log
+
+create-structure.sh
+
+# Fichiers de build Gradle
+.gradle/
+build/
+out/
+
+commit-fichier.sh

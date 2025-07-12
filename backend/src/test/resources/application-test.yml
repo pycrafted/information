@@ -1,0 +1,58 @@
+spring:
+  # Configuration de base de données H2 en mémoire pour les tests
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+    hikari:
+      auto-commit: false
+      connection-timeout: 3000
+      maximum-pool-size: 5
+    
+  # DÉSACTIVER Flyway pour les tests (utilise ddl-auto à la place)
+  flyway:
+    enabled: false
+    validate-on-migrate: false
+  
+  # Configuration JPA pour les tests
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+        hbm2ddl:
+          auto: create-drop
+    defer-datasource-initialization: false
+    generate-ddl: true
+  
+  # Configuration H2 Console pour debug (optionnel)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # Configuration de test
+  test:
+    database:
+      replace: none
+      
+  # Désactiver la sécurité pour les tests d'intégration
+  security:
+    enabled: false
+
+# Configuration des logs pour les tests
+logging:
+  level:
+    com.newsplatform: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# Configuration spécifique pour les tests
+management:
+  endpoints:
+    enabled-by-default: false
