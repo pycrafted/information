@@ -8,6 +8,8 @@ import com.newsplatform.entity.User;
 import com.newsplatform.exception.BusinessException;
 import com.newsplatform.exception.ValidationException;
 import com.newsplatform.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import java.util.UUID;
 @Transactional
 public class AuthService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
     private final TokenService tokenService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,24 +61,33 @@ public class AuthService {
             Optional<User> userOpt = findUserByUsernameOrEmail(loginRequest.getUsername());
             
             if (userOpt.isEmpty()) {
+                logger.warn("🔍 UTILISATEUR NON TROUVÉ - Username: '{}'", loginRequest.getUsername());
                 return AuthResponse.failure("Identifiants invalides");
             }
 
             User user = userOpt.get();
+            logger.info("👤 UTILISATEUR TROUVÉ - Username: '{}' - Rôle: {} - Actif: {}", 
+                       user.getUsername(), user.getRole(), user.getActive());
 
             // Vérification du mot de passe
             if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+                logger.warn("🔒 MOT DE PASSE INCORRECT - Username: '{}'", loginRequest.getUsername());
                 return AuthResponse.failure("Identifiants invalides");
             }
 
             // Vérification que l'utilisateur est actif
             if (!user.getActive()) {
+                logger.warn("🚫 COMPTE DÉSACTIVÉ - Username: '{}' - Rôle: {}", 
+                           user.getUsername(), user.getRole());
                 return AuthResponse.failure("Compte utilisateur désactivé");
             }
 
             // Extraction des informations de la requête HTTP
             String clientIp = extractClientIp(request);
             String userAgent = extractUserAgent(request);
+
+            logger.info("🔑 GÉNÉRATION DES JETONS - Username: '{}' - Rôle: {} - IP: {}", 
+                       user.getUsername(), user.getRole(), clientIp);
 
             // Génération des jetons JWT
             AuthToken accessToken = tokenService.generateAccessToken(user, clientIp, userAgent);
@@ -84,6 +96,9 @@ public class AuthService {
             // Mise à jour de la dernière connexion
             user.updateLastLogin();
             userRepository.save(user);
+
+            logger.info("🎉 AUTHENTIFICATION RÉUSSIE - Username: '{}' - Rôle: {} - IP: {} - Dernière connexion: {}", 
+                       user.getUsername(), user.getRole(), clientIp, user.getLastLogin());
 
             // Création de la réponse d'authentification
             return AuthResponse.success(
@@ -95,8 +110,12 @@ public class AuthService {
             );
 
         } catch (ValidationException e) {
+            logger.warn("⚠️ ERREUR DE VALIDATION - Username: '{}' - Erreur: {}", 
+                       loginRequest.getUsername(), e.getMessage());
             throw e;
         } catch (Exception e) {
+            logger.error("💥 ERREUR SYSTÈME - Username: '{}' - Erreur: {}", 
+                        loginRequest.getUsername(), e.getMessage(), e);
             throw new BusinessException("Erreur lors de l'authentification", e);
         }
     }
@@ -113,14 +132,22 @@ public class AuthService {
             // Recherche de l'utilisateur par ID
             Optional<User> userOpt = userRepository.findById(UUID.fromString(userId));
             if (userOpt.isEmpty()) {
+                logger.warn("🔍 UTILISATEUR NON TROUVÉ POUR DÉCONNEXION - UserID: {}", userId);
                 return AuthResponse.failure("Utilisateur non trouvé");
             }
             
+            User user = userOpt.get();
+            logger.info("🚪 DÉCONNEXION UTILISATEUR - Username: '{}' - Rôle: {} - UserID: {}", 
+                       user.getUsername(), user.getRole(), userId);
+            
             // Révocation de tous les jetons de l'utilisateur
-            tokenService.revokeAllUserTokens(userOpt.get());
+            tokenService.revokeAllUserTokens(user);
+            
+            logger.info("✅ JETONS RÉVOQUÉS - Username: '{}' - UserID: {}", user.getUsername(), userId);
             
             return new AuthResponse(true, "Déconnexion réussie");
         } catch (Exception e) {
+            logger.error("💥 ERREUR DÉCONNEXION - UserID: {} - Erreur: {}", userId, e.getMessage(), e);
             throw new BusinessException("Erreur lors de la déconnexion", e);
         }
     }
@@ -134,18 +161,27 @@ public class AuthService {
      */
     public AuthResponse refreshAccessToken(String refreshTokenValue, HttpServletRequest request) {
         try {
+            logger.info("🔄 VALIDATION REFRESH TOKEN - Token: {}...", 
+                       refreshTokenValue.substring(0, Math.min(10, refreshTokenValue.length())));
+            
             // Validation du jeton de rafraîchissement
             Optional<RefreshToken> refreshTokenOpt = tokenService.validateRefreshToken(refreshTokenValue);
             
             if (refreshTokenOpt.isEmpty()) {
+                logger.warn("❌ REFRESH TOKEN INVALIDE - Token: {}...", 
+                           refreshTokenValue.substring(0, Math.min(10, refreshTokenValue.length())));
                 return AuthResponse.failure("Jeton de rafraîchissement invalide");
             }
 
             RefreshToken refreshToken = refreshTokenOpt.get();
             User user = refreshToken.getUser();
             
+            logger.info("👤 UTILISATEUR REFRESH - Username: '{}' - Rôle: {} - Actif: {}", 
+                       user.getUsername(), user.getRole(), user.getActive());
+            
             // Vérification que l'utilisateur est toujours actif
             if (!user.getActive()) {
+                logger.warn("🚫 COMPTE DÉSACTIVÉ PENDANT REFRESH - Username: '{}'", user.getUsername());
                 return AuthResponse.failure("Compte utilisateur désactivé");
             }
 
@@ -153,8 +189,14 @@ public class AuthService {
             String clientIp = extractClientIp(request);
             String userAgent = extractUserAgent(request);
 
+            logger.info("🔑 GÉNÉRATION NOUVEAU ACCESS TOKEN - Username: '{}' - IP: {}", 
+                       user.getUsername(), clientIp);
+
             // Génération d'un nouveau jeton d'accès
             AuthToken newAccessToken = tokenService.generateAccessToken(user, clientIp, userAgent);
+
+            logger.info("✅ REFRESH TOKEN RÉUSSI - Username: '{}' - Rôle: {} - IP: {}", 
+                       user.getUsername(), user.getRole(), clientIp);
 
             // Création de la réponse avec le nouveau jeton
             return AuthResponse.success(
@@ -166,6 +208,7 @@ public class AuthService {
             );
 
         } catch (Exception e) {
+            logger.error("💥 ERREUR REFRESH TOKEN - Erreur: {}", e.getMessage(), e);
             throw new BusinessException("Erreur lors du rafraîchissement du jeton", e);
         }
     }
@@ -232,5 +275,55 @@ public class AuthService {
      */
     private String extractUserAgent(HttpServletRequest request) {
         return request.getHeader("User-Agent");
+    }
+
+    /**
+     * Validation d'un jeton d'accès JWT
+     * 
+     * @param tokenValue Jeton JWT à valider
+     * @return Réponse de validation
+     */
+    public AuthResponse validateToken(String tokenValue) {
+        try {
+            logger.info("🔍 VALIDATION ACCESS TOKEN - Token: {}...", 
+                       tokenValue.substring(0, Math.min(10, tokenValue.length())));
+            
+            // Validation du jeton via le service de tokens
+            Optional<AuthToken> tokenOpt = tokenService.validateAccessToken(tokenValue);
+            
+            if (tokenOpt.isEmpty()) {
+                logger.warn("❌ ACCESS TOKEN INVALIDE - Token: {}...", 
+                           tokenValue.substring(0, Math.min(10, tokenValue.length())));
+                return AuthResponse.failure("Jeton invalide ou expiré");
+            }
+
+            AuthToken token = tokenOpt.get();
+            User user = token.getUser();
+            
+            logger.info("👤 UTILISATEUR TOKEN VALIDE - Username: '{}' - Rôle: {} - Actif: {}", 
+                       user.getUsername(), user.getRole(), user.getActive());
+            
+            // Vérification que l'utilisateur est toujours actif
+            if (!user.getActive()) {
+                logger.warn("🚫 COMPTE DÉSACTIVÉ PENDANT VALIDATION - Username: '{}'", user.getUsername());
+                return AuthResponse.failure("Compte utilisateur désactivé");
+            }
+
+            logger.info("✅ TOKEN VALIDE - Username: '{}' - Rôle: {} - Expire: {}", 
+                       user.getUsername(), user.getRole(), token.getExpiresAt());
+
+            // Retourner les informations utilisateur si le jeton est valide
+            return AuthResponse.success(
+                token.getTokenValue(),
+                null, // Pas de refresh token pour la validation
+                token.getExpiresAt(),
+                null,
+                user
+            );
+
+        } catch (Exception e) {
+            logger.error("💥 ERREUR VALIDATION TOKEN - Erreur: {}", e.getMessage(), e);
+            throw new BusinessException("Erreur lors de la validation du jeton", e);
+        }
     }
 }

@@ -92,7 +92,8 @@ public class LogCleanupService {
             
         } catch (Exception e) {
             logger.error("❌ Erreur lors du nettoyage des logs : {}", e.getMessage(), e);
-            throw new RuntimeException("Échec du nettoyage des logs", e);
+            // Ne plus lancer d'exception pour éviter d'arrêter l'application
+            logger.warn("⚠️  Le nettoyage des logs a échoué mais l'application va continuer de démarrer");
         }
     }
     

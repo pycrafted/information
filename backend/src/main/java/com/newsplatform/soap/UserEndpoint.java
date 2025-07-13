@@ -5,6 +5,8 @@ import com.newsplatform.dto.soap.UserSoapResponse;
 import com.newsplatform.entity.User;
 import com.newsplatform.service.TokenService;
 import com.newsplatform.service.UserSoapService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,6 +28,7 @@ import java.util.UUID;
 @Endpoint
 public class UserEndpoint {
 
+    private static final Logger log = LoggerFactory.getLogger(UserEndpoint.class);
     private static final String NAMESPACE_URI = "http://newsplatform.com/soap/users";
 
     private final UserSoapService userSoapService;
@@ -47,6 +50,10 @@ public class UserEndpoint {
     @PayloadRoot(namespace = NAMESPACE_URI, localPart = "userRequest")
     @ResponsePayload
     public UserSoapResponse manageUsers(@RequestPayload UserSoapRequest request) {
+        log.info("🔧 USER SOAP - Méthode manageUsers() appelée !");
+        log.info("🔍 USER SOAP - Opération demandée: {}", request.getOperation());
+        log.info("🔍 USER SOAP - Token présent: {}", request.getAuthToken() != null ? "OUI" : "NON");
+        
         long startTime = System.currentTimeMillis();
         
         try {
@@ -80,6 +87,7 @@ public class UserEndpoint {
             return response;
 
         } catch (Exception e) {
+            log.error("❌ USER SOAP - Erreur service: {}", e.getMessage(), e);
             return UserSoapResponse.failure(
                 "Erreur du service SOAP : " + e.getMessage(),
                 "SERVICE_ERROR"
@@ -245,13 +253,18 @@ public class UserEndpoint {
      * @return true si le jeton est valide
      */
     private boolean isValidAuthToken(String authToken) {
+        log.info("🔒 USER SOAP - Validation du token d'authentification...");
         if (authToken == null || authToken.trim().isEmpty()) {
+            log.warn("⚠️ USER SOAP - Token vide ou null");
             return false;
         }
         
         try {
-            return tokenService.validateAccessToken(authToken).isPresent();
+            boolean isValid = tokenService.validateAccessToken(authToken).isPresent();
+            log.info("🔒 USER SOAP - Token valide: {}", isValid ? "OUI" : "NON");
+            return isValid;
         } catch (Exception e) {
+            log.error("❌ USER SOAP - Erreur validation token: {}", e.getMessage());
             return false;
         }
     }
@@ -264,9 +277,13 @@ public class UserEndpoint {
      * @return true si le jeton appartient à un administrateur
      */
     private boolean isAdminToken(String authToken) {
+        log.info("👑 USER SOAP - Vérification privilèges admin...");
         try {
-            return tokenService.isAdminToken(authToken);
+            boolean isAdmin = tokenService.isAdminToken(authToken);
+            log.info("👑 USER SOAP - Privilèges admin: {}", isAdmin ? "OUI" : "NON");
+            return isAdmin;
         } catch (Exception e) {
+            log.error("❌ USER SOAP - Erreur vérification admin: {}", e.getMessage());
             return false;
         }
     }

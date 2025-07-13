@@ -29,6 +29,29 @@ public interface AuthTokenRepository extends JpaRepository<AuthToken, UUID> {
     Optional<AuthToken> findByTokenValue(String tokenValue);
 
     /**
+     * Trouve un jeton par sa valeur avec l'utilisateur chargé
+     * @param tokenValue Valeur du jeton JWT
+     * @return Optional contenant le jeton avec utilisateur si trouvé
+     */
+    @Query("SELECT t FROM AuthToken t JOIN FETCH t.user WHERE t.tokenValue = :tokenValue")
+    Optional<AuthToken> findByTokenValueWithUser(@Param("tokenValue") String tokenValue);
+
+    /**
+     * Trouve tous les jetons par sa valeur (pour nettoyage des doublons)
+     * @param tokenValue Valeur du jeton JWT
+     * @return Liste des jetons avec cette valeur
+     */
+    List<AuthToken> findAllByTokenValue(String tokenValue);
+
+    /**
+     * Trouve tous les jetons par sa valeur avec utilisateurs chargés
+     * @param tokenValue Valeur du jeton JWT
+     * @return Liste des jetons avec utilisateurs chargés
+     */
+    @Query("SELECT t FROM AuthToken t JOIN FETCH t.user WHERE t.tokenValue = :tokenValue")
+    List<AuthToken> findAllByTokenValueWithUser(@Param("tokenValue") String tokenValue);
+
+    /**
      * Trouve tous les jetons actifs d'un utilisateur
      * @param user Utilisateur propriétaire des jetons
      * @param status Statut des jetons (ACTIVE)

@@ -79,8 +79,14 @@ public class CategoryController {
     })
     @GetMapping("/roots")
     public ResponseEntity<List<CategoryResponse>> getRootCategories() {
-        List<CategoryResponse> categories = categoryFacade.getRootCategoriesWithChildren();
-        return ResponseEntity.ok(categories);
+        try {
+            List<CategoryResponse> categories = categoryFacade.getRootCategoriesWithChildren();
+            return ResponseEntity.ok(categories);
+        } catch (Exception e) {
+            // Log de l'erreur (optionnel : utiliser un logger)
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
+        }
     }
     
     /**
@@ -222,7 +228,7 @@ public class CategoryController {
         @ApiResponse(responseCode = "403", description = "Accès refusé - rôle insuffisant")
     })
     @PostMapping
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
         CategoryResponse category = categoryFacade.createRootCategory(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(category);
@@ -248,7 +254,7 @@ public class CategoryController {
         @ApiResponse(responseCode = "404", description = "Catégorie parente non trouvée")
     })
     @PostMapping("/{parentId}/subcategories")
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> createSubCategory(
             @Parameter(description = "ID de la catégorie parente") @PathVariable UUID parentId, 
             @Valid @RequestBody CategoryRequest request) {
@@ -278,7 +284,7 @@ public class CategoryController {
         @ApiResponse(responseCode = "404", description = "Catégorie non trouvée")
     })
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> updateCategory(
             @Parameter(description = "ID de la catégorie à modifier") @PathVariable UUID id, 
             @Valid @RequestBody CategoryRequest request) {
@@ -306,7 +312,7 @@ public class CategoryController {
         @ApiResponse(responseCode = "404", description = "Catégorie non trouvée")
     })
     @PatchMapping("/{id}/move")
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> moveCategory(
             @Parameter(description = "ID de la catégorie à déplacer") @PathVariable UUID id, 
             @Parameter(description = "ID du nouveau parent (null pour racine)") @RequestParam(required = false) UUID newParentId) {
@@ -337,7 +343,7 @@ public class CategoryController {
         @ApiResponse(responseCode = "404", description = "Catégorie non trouvée")
     })
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteCategory(@Parameter(description = "ID de la catégorie à supprimer") @PathVariable UUID id) {
         categoryFacade.deleteCategory(id);
         return ResponseEntity.noContent().build();

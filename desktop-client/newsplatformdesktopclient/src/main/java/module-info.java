@@ -2,6 +2,8 @@ module com.newsplatformdesktopclient {
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.web;
+    requires java.net.http;   // Pour HttpClient SOAP
+    requires java.xml;        // Pour DocumentBuilder XML
 
     requires org.controlsfx.controls;
     requires com.dlsc.formsfx;

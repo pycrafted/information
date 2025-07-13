@@ -136,3 +136,11 @@ flyway {
 	password = 'G7!pR2@vLq8z'
 	locations = ['filesystem:src/main/resources/db/migration']
 }
+
+// Tâche pour générer un hash BCrypt
+task generateHash(type: JavaExec) {
+    group = 'application'
+    description = 'Génère un hash BCrypt pour admin123'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.newsplatform.util.PasswordHashGenerator'
+}

@@ -9,6 +9,8 @@ import com.newsplatform.exception.ValidationException;
 import com.newsplatform.exception.BusinessException;
 import com.newsplatform.mapper.ArticleMapper;
 import com.newsplatform.repository.CategoryRepository;
+import com.newsplatform.repository.UserRepository;
+import com.newsplatform.security.UserPrincipal;
 import com.newsplatform.service.ArticleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.UUID;
+import com.newsplatform.entity.ArticleStatus;
 
 /**
  * Facade pour la gestion des articles selon l'architecture DDD.
@@ -41,12 +44,14 @@ public class ArticleFacade {
     private final ArticleService articleService;
     private final ArticleMapper articleMapper;
     private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
     
     @Autowired
-    public ArticleFacade(ArticleService articleService, ArticleMapper articleMapper, CategoryRepository categoryRepository) {
+    public ArticleFacade(ArticleService articleService, ArticleMapper articleMapper, CategoryRepository categoryRepository, UserRepository userRepository) {
         this.articleService = articleService;
         this.articleMapper = articleMapper;
         this.categoryRepository = categoryRepository;
+        this.userRepository = userRepository;
     }
     
     // ===============================================
@@ -109,6 +114,42 @@ public class ArticleFacade {
         
         Page<Article> articles = articleService.getPublishedArticlesByCategory(categorySlug, pageable);
         return articles.map(articleMapper::toResponse); 
+    }
+
+    /**
+     * Récupère tous les articles de l'utilisateur connecté avec pagination.
+     * Responsabilité : Orchestration + authentification + transformation
+     * 
+     * @param pageable Configuration de pagination
+     * @return Page des articles de l'utilisateur connecté
+     */
+    public Page<ArticleResponse> getMyArticles(Pageable pageable) {
+        // Récupération de l'utilisateur connecté
+        User currentUser = getCurrentAuthenticatedUser();
+        
+        // Orchestration : appel du service métier
+        Page<Article> userArticles = articleService.getArticlesByAuthor(currentUser, pageable);
+        
+        // Transformation : entités → DTOs
+        return userArticles.map(articleMapper::toResponse);
+    }
+
+    /**
+     * Récupère les brouillons de l'utilisateur connecté avec pagination.
+     * Responsabilité : Orchestration + authentification + filtrage + transformation
+     * 
+     * @param pageable Configuration de pagination
+     * @return Page des brouillons de l'utilisateur connecté
+     */
+    public Page<ArticleResponse> getMyDrafts(Pageable pageable) {
+        // Récupération de l'utilisateur connecté
+        User currentUser = getCurrentAuthenticatedUser();
+        
+        // Orchestration : appel du service métier avec filtrage par auteur et statut
+        Page<Article> userDrafts = articleService.getArticlesByAuthorAndStatus(currentUser, ArticleStatus.DRAFT, pageable);
+        
+        // Transformation : entités → DTOs
+        return userDrafts.map(articleMapper::toResponse);
     }
 
     // ===============================================
@@ -275,11 +316,15 @@ public class ArticleFacade {
         }
         
         Object principal = authentication.getPrincipal();
-        if (!(principal instanceof User)) {
+        if (!(principal instanceof UserPrincipal)) {
             throw new ValidationException("Principal de sécurité invalide");
         }
         
-        return (User) principal;
+        UserPrincipal userPrincipal = (UserPrincipal) principal;
+        
+        // Récupérer l'entité User complète depuis la base de données
+        return userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new ValidationException("Utilisateur non trouvé"));
     }
     
     /**
@@ -290,10 +335,17 @@ public class ArticleFacade {
      * @throws ResourceNotFoundException si la catégorie n'existe pas
      */
     private String getCategorySlugById(UUID categoryId) {
-        return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                    "Catégorie non trouvée avec l'ID : " + categoryId))
-                .getSlug();
+        try {
+            return categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                        "Catégorie non trouvée avec l'ID : " + categoryId))
+                    .getSlug();
+        } catch (Exception e) {
+            // Si l'UUID n'existe pas, on essaie de le traiter comme un slug
+            // Cela peut arriver si le frontend envoie un UUID au lieu d'un slug
+            throw new ResourceNotFoundException(
+                "Catégorie non trouvée avec le slug : " + categoryId);
+        }
     }
 
     // ===============================================

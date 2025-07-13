@@ -8,13 +8,6 @@ cd backend
 ./gradlew clean build -x test
 cd ..
 
-# Frontend
-echo "🎨 Building Frontend..."
-cd frontend
-pnpm install
-pnpm build
-cd ..
-
 # Desktop Client
 echo "🖥️ Building Desktop Client..."
 cd desktop-client

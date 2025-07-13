@@ -29,6 +29,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     Optional<RefreshToken> findByTokenValue(String tokenValue);
 
     /**
+     * Trouve tous les jetons de rafraîchissement par sa valeur
+     * @param tokenValue Valeur du refresh token
+     * @return Liste de tous les jetons avec cette valeur
+     */
+    List<RefreshToken> findAllByTokenValue(String tokenValue);
+
+    /**
      * Trouve tous les jetons de rafraîchissement valides d'un utilisateur
      * @param user Utilisateur propriétaire des jetons
      * @param revoked Statut de révocation (false pour les valides)

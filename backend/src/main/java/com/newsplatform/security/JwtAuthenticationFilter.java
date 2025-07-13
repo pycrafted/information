@@ -8,8 +8,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -27,10 +27,9 @@ import java.util.Optional;
  * Couche Sécurité : Validation des jetons JWT et extraction des informations utilisateur
  * Supporte les 3 rôles selon le cahier des charges : VISITEUR, EDITEUR, ADMINISTRATEUR.
  */
-@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final Log logger = LogFactory.getLog(JwtAuthenticationFilter.class);
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     
     private final TokenService tokenService;
     private final UserRepository userRepository;
@@ -74,8 +73,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     AuthToken authToken = authTokenOpt.get();
                     User user = authToken.getUser();
                     
+                    logger.debug("🔍 Token validé pour l'utilisateur: {} (actif: {})", 
+                               user != null ? user.getUsername() : "null", 
+                               user != null ? user.getActive() : "null");
+                    
                     // Vérification supplémentaire que l'utilisateur est actif
-                    if (user.getActive()) {
+                    if (user != null && user.getActive()) {
                         
                         // Création des autorités selon le rôle utilisateur
                         List<SimpleGrantedAuthority> authorities = createAuthoritiesFromUserRole(user.getRole());
@@ -93,13 +96,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         
                         // Définition du contexte de sécurité
                         SecurityContextHolder.getContext().setAuthentication(authentication);
+                        logger.debug("✅ Authentification définie pour l'utilisateur: {}", user.getUsername());
                     }
                 }
             }
             
         } catch (Exception e) {
             // En cas d'erreur, on laisse la chaîne continuer sans authentification
-            logger.debug("Impossible de définir l'authentification utilisateur : " + e.getMessage());
+            if (logger.isDebugEnabled()) {
+                logger.debug("Impossible de définir l'authentification utilisateur : " + e.getMessage());
+            }
         }
 
         // Continuation de la chaîne de filtres

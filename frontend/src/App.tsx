@@ -1,75 +1,90 @@
-import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import Header from './components/Header';
+import HomePage from './pages/HomePage';
+import CategoryPage from './pages/CategoryPage';
+import LoginPage from './pages/LoginPage';
+import EditorPage from './pages/EditorPage';
+import AdminPage from './pages/AdminPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import './App.css';
 
-import { Header } from './components/common/Header'
-import { Footer } from './components/common/Footer'
-import { HomePage } from './pages/HomePage'
-import { ArticlePage } from './pages/ArticlePage'
-import { LoginPage } from './pages/LoginPage'
-import { RegisterPage } from './pages/RegisterPage'
-import { AdminPage } from './pages/AdminPage'
-import { EditorPage } from './pages/EditorPage'
-import { CategoriesPage } from './pages/CategoriesPage'
-import { CategoryPage } from './pages/CategoryPage'
-import { NotFoundPage } from './pages/NotFoundPage'
-import { ProtectedRoute } from './components/auth/ProtectedRoute'
-
-/**
- * Composant principal de l'application News Platform
- * 
- * Architecture :
- * - Header : navigation commune à toutes les pages
- * - Main : contenu principal avec routage React Router
- * - Footer : informations communes
- * 
- * Routing :
- * - Routes publiques : accueil, articles, connexion, inscription
- * - Routes protégées : administration, édition
- * - Routes avec paramètres : articles/{id}, catégories/{slug}
- */
-const App: React.FC = () => {
+function App() {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <Header />
-      
-      <main className="flex-1">
-        <Routes>
-          {/* Routes publiques */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/article/:id" element={<ArticlePage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
-          <Route path="/category/:slug" element={<CategoryPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+    <Router>
+      <AuthProvider>
+        <div className="App">
+          {/* Header avec navigation */}
+          <Header />
           
-          {/* Routes protégées - Éditeur */}
-          <Route 
-            path="/editor/*" 
-            element={
-              <ProtectedRoute allowedRoles={['EDITEUR', 'ADMINISTRATEUR']}>
-                <EditorPage />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Routes protégées - Administrateur */}
-          <Route 
-            path="/admin/*" 
-            element={
-              <ProtectedRoute allowedRoles={['ADMINISTRATEUR']}>
-                <AdminPage />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Page 404 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </main>
-      
-      <Footer />
-    </div>
-  )
+          {/* Contenu principal avec routes */}
+          <main>
+            <Routes>
+              {/* Page d'accueil */}
+              <Route path="/" element={<HomePage />} />
+              
+              {/* Pages de catégories */}
+              <Route path="/category/:slug" element={<CategoryPage />} />
+              
+              {/* Page de connexion */}
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Routes protégées (exemples pour plus tard) */}
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <div style={{ padding: '40px', textAlign: 'center' }}>
+                    <h1>👤 Profil Utilisateur</h1>
+                    <p>Page à implémenter dans l'étape 6</p>
+                  </div>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/editor" element={
+                <ProtectedRoute requiredRole="EDITEUR">
+                  <EditorPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/admin" element={
+                <ProtectedRoute requiredRole="ADMINISTRATEUR">
+                  <AdminPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Route 404 */}
+              <Route path="*" element={
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '50px',
+                  maxWidth: '600px',
+                  margin: '0 auto'
+                }}>
+                  <div style={{ fontSize: '5em', marginBottom: '20px' }}>🤔</div>
+                  <h1 style={{ color: '#666' }}>Page non trouvée</h1>
+                  <p style={{ color: '#999', marginBottom: '30px' }}>
+                    La page que vous cherchez n'existe pas.
+                  </p>
+                  <a 
+                    href="/"
+                    style={{
+                      display: 'inline-block',
+                      padding: '12px 24px',
+                      backgroundColor: '#007bff',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    🏠 Retour à l'accueil
+                  </a>
+                </div>
+              } />
+            </Routes>
+          </main>
+        </div>
+      </AuthProvider>
+    </Router>
+  );
 }
 
-export default App 
+export default App;

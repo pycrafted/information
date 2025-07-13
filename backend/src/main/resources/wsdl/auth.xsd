@@ -2,13 +2,13 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            xmlns:tns="http://newsplatform.com/soap/auth"
            targetNamespace="http://newsplatform.com/soap/auth"
-           elementFormDefault="qualified">
+           elementFormDefault="unqualified">
 
     <!-- Éléments de requête et réponse pour l'authentification -->
-    <xs:element name="loginSoapRequest" type="tns:LoginSoapRequest"/>
-    <xs:element name="loginSoapResponse" type="tns:LoginSoapResponse"/>
-    <xs:element name="logoutSoapRequest" type="tns:LogoutSoapRequest"/>
-    <xs:element name="logoutSoapResponse" type="tns:LogoutSoapResponse"/>
+    <xs:element name="loginRequest" type="tns:LoginSoapRequest"/>
+    <xs:element name="loginResponse" type="tns:LoginSoapResponse"/>
+    <xs:element name="logoutRequest" type="tns:LogoutSoapRequest"/>
+    <xs:element name="logoutResponse" type="tns:LogoutSoapResponse"/>
 
     <!-- Type de données pour la requête de connexion -->
     <xs:complexType name="LoginSoapRequest">

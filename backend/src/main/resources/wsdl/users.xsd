@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://newsplatform.com/soap/users"
+           targetNamespace="http://newsplatform.com/soap/users"
+           elementFormDefault="unqualified">
+
+    <!-- Éléments de requête et réponse pour la gestion des utilisateurs -->
+    <xs:element name="userRequest" type="tns:UserSoapRequest"/>
+    <xs:element name="userResponse" type="tns:UserSoapResponse"/>
+
+    <!-- Type de données pour la requête de gestion des utilisateurs -->
+    <xs:complexType name="UserSoapRequest">
+        <xs:sequence>
+            <xs:element name="operation" type="tns:OperationType" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Type d'opération à effectuer : LIST, ADD, UPDATE, DELETE</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="authToken" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Jeton d'authentification JWT pour sécuriser l'accès</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="userId" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>ID de l'utilisateur (requis pour UPDATE et DELETE)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="userData" type="tns:UserData" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Données utilisateur (requis pour ADD et UPDATE)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="pagination" type="tns:PaginationParams" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Paramètres de pagination (optionnel pour LIST)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour la réponse de gestion des utilisateurs -->
+    <xs:complexType name="UserSoapResponse">
+        <xs:sequence>
+            <xs:element name="success" type="xs:boolean" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Indicateur de succès de l'opération</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="message" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Message descriptif du résultat</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="errorCode" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Code d'erreur en cas d'échec</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="user" type="tns:UserInfo" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Informations d'un utilisateur unique (ADD, UPDATE)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="users" type="tns:UserList" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Liste d'utilisateurs (LIST)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="pageInfo" type="tns:PageInfo" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Informations de pagination (LIST)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour les informations utilisateur -->
+    <xs:complexType name="UserData">
+        <xs:sequence>
+            <xs:element name="username" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Nom d'utilisateur unique</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="email" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Adresse email unique</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="password" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Mot de passe en clair (sera chiffré côté serveur)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="firstName" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Prénom de l'utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="lastName" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Nom de famille de l'utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="role" type="tns:UserRole" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Rôle de l'utilisateur dans le système</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="active" type="xs:boolean" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Statut actif/inactif de l'utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour les informations complètes d'un utilisateur -->
+    <xs:complexType name="UserInfo">
+        <xs:sequence>
+            <xs:element name="id" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Identifiant unique de l'utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="username" type="xs:string" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Nom d'utilisateur unique</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="email" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Adresse email</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="firstName" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Prénom</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="lastName" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Nom de famille</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="role" type="tns:UserRole" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Rôle dans le système</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="roleDescription" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Description du rôle</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="active" type="xs:boolean" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Statut actif/inactif</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="createdAt" type="xs:dateTime" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Date de création du compte</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="lastLogin" type="xs:dateTime" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation>Date de dernière connexion</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour une liste d'utilisateurs -->
+    <xs:complexType name="UserList">
+        <xs:sequence>
+            <xs:element name="user" type="tns:UserInfo" minOccurs="0" maxOccurs="unbounded">
+                <xs:annotation>
+                    <xs:documentation>Liste des utilisateurs</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour la pagination -->
+    <xs:complexType name="PaginationParams">
+        <xs:sequence>
+            <xs:element name="page" type="xs:int" minOccurs="0" default="0">
+                <xs:annotation>
+                    <xs:documentation>Numéro de page (commence à 0)</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="size" type="xs:int" minOccurs="0" default="10">
+                <xs:annotation>
+                    <xs:documentation>Nombre d'éléments par page</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="sortBy" type="xs:string" minOccurs="0" default="username">
+                <xs:annotation>
+                    <xs:documentation>Champ de tri</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="sortDir" type="tns:SortDirection" minOccurs="0" default="ASC">
+                <xs:annotation>
+                    <xs:documentation>Direction de tri</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Type de données pour les informations de pagination -->
+    <xs:complexType name="PageInfo">
+        <xs:sequence>
+            <xs:element name="currentPage" type="xs:int" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Page actuelle</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="totalPages" type="xs:int" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Nombre total de pages</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="totalElements" type="xs:long" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Nombre total d'éléments</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="pageSize" type="xs:int" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Taille de la page</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="hasNext" type="xs:boolean" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Indique s'il y a une page suivante</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="hasPrevious" type="xs:boolean" minOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Indique s'il y a une page précédente</xs:documentation>
+                </xs:annotation>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Énumération des types d'opération -->
+    <xs:simpleType name="OperationType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="LIST">
+                <xs:annotation>
+                    <xs:documentation>Lister les utilisateurs</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="ADD">
+                <xs:annotation>
+                    <xs:documentation>Ajouter un utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="UPDATE">
+                <xs:annotation>
+                    <xs:documentation>Modifier un utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="DELETE">
+                <xs:annotation>
+                    <xs:documentation>Supprimer un utilisateur</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Énumération des rôles utilisateur -->
+    <xs:simpleType name="UserRole">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="VISITEUR">
+                <xs:annotation>
+                    <xs:documentation>Utilisateur avec accès lecture seule</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="EDITEUR">
+                <xs:annotation>
+                    <xs:documentation>Utilisateur avec droits de création et modification d'articles</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="ADMINISTRATEUR">
+                <xs:annotation>
+                    <xs:documentation>Utilisateur avec droits d'administration complète</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Énumération des directions de tri -->
+    <xs:simpleType name="SortDirection">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="ASC">
+                <xs:annotation>
+                    <xs:documentation>Tri croissant</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+            <xs:enumeration value="DESC">
+                <xs:annotation>
+                    <xs:documentation>Tri décroissant</xs:documentation>
+                </xs:annotation>
+            </xs:enumeration>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema> 

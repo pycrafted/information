@@ -203,6 +203,20 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
            "ORDER BY a.updatedAt DESC")
     Page<Article> findByStatus(@Param("status") ArticleStatus status, Pageable pageable);
 
+    /**
+     * Récupère les articles d'un auteur avec un statut spécifique.
+     * 
+     * @param author auteur des articles
+     * @param status statut des articles
+     * @param pageable configuration de pagination
+     * @return page des articles de l'auteur avec le statut donné
+     */
+    @Query("SELECT a FROM Article a " +
+           "JOIN FETCH a.category c " +
+           "WHERE a.author = :author AND a.status = :status " +
+           "ORDER BY a.updatedAt DESC")
+    Page<Article> findByAuthorAndStatus(@Param("author") User author, @Param("status") ArticleStatus status, Pageable pageable);
+
     // ===============================================
     // REQUÊTES DE STATISTIQUES
     // ===============================================
@@ -239,29 +253,27 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     long countByAuthor(@Param("author") User author);
 
     // ===============================================
-    // REQUÊTES DE VALIDATION MÉTIER
+    // REQUÊTES DE VALIDATION D'UNICITÉ
     // ===============================================
     
     /**
-     * Vérifie si un slug existe déjà.
-     * Utilisé pour validation d'unicité lors de la création/modification.
+     * Vérifie si un article avec ce slug existe déjà.
+     * Utilisé pour validation d'unicité lors de la création.
      * 
      * @param slug slug à vérifier
-     * @return true si le slug existe
+     * @return true si un article avec ce slug existe
      */
     boolean existsBySlug(String slug);
     
     /**
-     * Vérifie si un slug existe pour un autre article (modification).
+     * Vérifie si un article avec ce slug existe déjà, excluant l'article avec l'ID donné.
+     * Utilisé pour validation d'unicité lors de la mise à jour.
      * 
      * @param slug slug à vérifier
-     * @param articleId ID de l'article en cours de modification
-     * @return true si le slug existe pour un autre article
+     * @param id ID de l'article à exclure de la vérification
+     * @return true si un autre article avec ce slug existe
      */
-    @Query("SELECT COUNT(a) > 0 FROM Article a " +
-           "WHERE a.slug = :slug AND a.id != :articleId")
-    boolean existsBySlugAndIdNot(@Param("slug") String slug, 
-                               @Param("articleId") UUID articleId);
+    boolean existsBySlugAndIdNot(String slug, UUID id);
 
     // ===============================================
     // REQUÊTES DE SUPPRESSION AVANCÉES

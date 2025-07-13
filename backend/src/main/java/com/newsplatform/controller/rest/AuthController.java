@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Authentification", description = "API d'authentification JWT pour les 3 rôles utilisateur")
 public class AuthController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private final AuthService authService;
 
     @Autowired
@@ -53,9 +56,9 @@ public class AuthController {
             - **ADMINISTRATEUR** : CRUD Utilisateurs + gestion jetons
             
             **Utilisateurs de test :**
-            - `admin` / `password` - Administrateur complet
-            - `editeur` / `password` - Éditeur articles/catégories
-            - `visiteur` / `password` - Lecture uniquement
+            - `admin` / `OusmaneSonko@2029` - Administrateur complet
+            - `editeur` / `OusmaneSonko@2029` - Éditeur articles/catégories
+            - `visiteur` / `OusmaneSonko@2029` - Lecture uniquement
             
             **Retourne :**
             - `accessToken` : Jeton d'accès JWT (1h)
@@ -76,16 +79,33 @@ public class AuthController {
             LoginRequest loginRequest,
             HttpServletRequest request) {
         
+        // Log de la tentative de connexion
+        String clientIp = getClientIp(request);
+        String userAgent = request.getHeader("User-Agent");
+        logger.info("🔐 TENTATIVE DE CONNEXION - Utilisateur: '{}' - IP: {} - User-Agent: {}", 
+                   loginRequest.getUsername(), clientIp, userAgent);
+        
         try {
             AuthResponse response = authService.authenticateUser(loginRequest, request);
             
             if (response.isSuccess()) {
+                // Log de connexion réussie
+                logger.info("✅ CONNEXION RÉUSSIE - Utilisateur: '{}' - Rôle: {} - IP: {}", 
+                           loginRequest.getUsername(), 
+                           response.getUser() != null ? response.getUser().getRole() : "N/A",
+                           clientIp);
                 return ResponseEntity.ok(response);
             } else {
+                // Log d'échec de connexion
+                logger.warn("❌ ÉCHEC DE CONNEXION - Utilisateur: '{}' - Raison: {} - IP: {}", 
+                           loginRequest.getUsername(), response.getMessage(), clientIp);
                 return ResponseEntity.status(401).body(response);
             }
             
         } catch (Exception e) {
+            // Log d'erreur système
+            logger.error("💥 ERREUR SYSTÈME - Utilisateur: '{}' - Erreur: {} - IP: {}", 
+                        loginRequest.getUsername(), e.getMessage(), clientIp);
             return ResponseEntity.status(500).body(
                 AuthResponse.failure("Erreur interne du serveur")
             );
@@ -122,18 +142,27 @@ public class AuthController {
     public ResponseEntity<AuthResponse> logout(
             @RequestParam 
             @Parameter(description = "ID de l'utilisateur", required = true)
-            String userId) {
+            String userId,
+            HttpServletRequest request) {
+        
+        String clientIp = getClientIp(request);
+        logger.info("🚪 TENTATIVE DE DÉCONNEXION - UserID: {} - IP: {}", userId, clientIp);
         
         try {
             AuthResponse response = authService.logoutUser(userId);
             
             if (response.isSuccess()) {
+                logger.info("✅ DÉCONNEXION RÉUSSIE - UserID: {} - IP: {}", userId, clientIp);
                 return ResponseEntity.ok(response);
             } else {
+                logger.warn("❌ ÉCHEC DÉCONNEXION - UserID: {} - Raison: {} - IP: {}", 
+                           userId, response.getMessage(), clientIp);
                 return ResponseEntity.status(404).body(response);
             }
             
         } catch (Exception e) {
+            logger.error("💥 ERREUR DÉCONNEXION - UserID: {} - Erreur: {} - IP: {}", 
+                        userId, e.getMessage(), clientIp);
             return ResponseEntity.status(500).body(
                 AuthResponse.failure("Erreur lors de la déconnexion")
             );
@@ -177,16 +206,25 @@ public class AuthController {
             String refreshToken,
             HttpServletRequest request) {
         
+        String clientIp = getClientIp(request);
+        logger.info("🔄 TENTATIVE REFRESH TOKEN - IP: {} - Token: {}...", 
+                   clientIp, refreshToken.substring(0, Math.min(10, refreshToken.length())));
+        
         try {
             AuthResponse response = authService.refreshAccessToken(refreshToken, request);
             
             if (response.isSuccess()) {
+                logger.info("✅ REFRESH TOKEN RÉUSSI - IP: {}", clientIp);
                 return ResponseEntity.ok(response);
             } else {
+                logger.warn("❌ ÉCHEC REFRESH TOKEN - Raison: {} - IP: {}", 
+                           response.getMessage(), clientIp);
                 return ResponseEntity.status(401).body(response);
             }
             
         } catch (Exception e) {
+            logger.error("💥 ERREUR REFRESH TOKEN - Erreur: {} - IP: {}", 
+                        e.getMessage(), clientIp);
             return ResponseEntity.status(500).body(
                 AuthResponse.failure("Erreur lors du rafraîchissement")
             );
@@ -198,7 +236,7 @@ public class AuthController {
      * Endpoint utilitaire pour valider un jeton JWT côté client
      * 
      * @param token Jeton JWT à valider
-     * @return Statut de validité
+     * @return Statut de validité du jeton
      */
     @GetMapping("/validate")
     @Operation(
@@ -225,19 +263,48 @@ public class AuthController {
     public ResponseEntity<AuthResponse> validateToken(
             @RequestParam 
             @Parameter(description = "Jeton JWT à valider", required = true)
-            String token) {
+            String token,
+            HttpServletRequest request) {
+        
+        String clientIp = getClientIp(request);
+        logger.info("🔍 VALIDATION TOKEN - IP: {} - Token: {}...", 
+                   clientIp, token.substring(0, Math.min(10, token.length())));
         
         try {
-            // Pour l'instant, simple validation via le service
-            // À implémenter : TokenService.validateAccessToken()
-            return ResponseEntity.ok(
-                new AuthResponse(true, "Jeton valide")
-            );
+            AuthResponse response = authService.validateToken(token);
+            
+            if (response.isSuccess()) {
+                logger.info("✅ TOKEN VALIDE - IP: {}", clientIp);
+                return ResponseEntity.ok(response);
+            } else {
+                logger.warn("❌ TOKEN INVALIDE - Raison: {} - IP: {}", 
+                           response.getMessage(), clientIp);
+                return ResponseEntity.status(401).body(response);
+            }
             
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(
-                AuthResponse.failure("Jeton invalide")
+            logger.error("💥 ERREUR VALIDATION TOKEN - Erreur: {} - IP: {}", 
+                        e.getMessage(), clientIp);
+            return ResponseEntity.status(500).body(
+                AuthResponse.failure("Erreur lors de la validation")
             );
         }
+    }
+
+    /**
+     * Extraction de l'adresse IP du client
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
+            return xForwardedFor.split(",")[0];
+        }
+        
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty() && !"unknown".equalsIgnoreCase(xRealIp)) {
+            return xRealIp;
+        }
+        
+        return request.getRemoteAddr();
     }
 }

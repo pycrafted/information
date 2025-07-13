@@ -361,6 +361,80 @@ public class ArticleController {
     }
 
     // ===============================================
+    // ENDPOINTS UTILISATEUR CONNECTÉ
+    // ===============================================
+    
+    /**
+     * Récupère les articles de l'utilisateur connecté avec pagination.
+     * Endpoint sécurisé pour les éditeurs pour voir leurs propres articles.
+     */
+    @GetMapping("/my-articles")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
+    @Operation(
+        summary = "Récupère mes articles",
+        description = """
+            **Endpoint sécurisé** - Récupère tous les articles de l'utilisateur connecté.
+            
+            ### Authentification requise :
+            - 🔐 **JWT Bearer Token** obligatoire
+            - 👤 **Rôles autorisés** : EDITEUR, ADMINISTRATEUR
+            
+            ### Caractéristiques :
+            - 📄 **Paginé** : Support pagination complète
+            - 📊 **Tous statuts** : DRAFT, PUBLISHED, ARCHIVED
+            - 👤 **Personnel** : Seuls vos propres articles
+            """,
+        tags = {"Articles", "Personnel"},
+        security = @SecurityRequirement(name = "BearerAuth")
+    )
+    public ResponseEntity<Page<ArticleResponse>> getMyArticles(
+        @Parameter(
+            description = "Configuration de pagination et tri",
+            schema = @Schema(implementation = Pageable.class)
+        )
+        @PageableDefault(size = 10, sort = "updatedAt", direction = Sort.Direction.DESC)
+        Pageable pageable
+    ) {
+        Page<ArticleResponse> myArticles = articleFacade.getMyArticles(pageable);
+        return ResponseEntity.ok(myArticles);
+    }
+    
+    /**
+     * Récupère les brouillons de l'utilisateur connecté avec pagination.
+     * Endpoint sécurisé pour les éditeurs pour voir leurs brouillons.
+     */
+    @GetMapping("/my-drafts")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
+    @Operation(
+        summary = "Récupère mes brouillons",
+        description = """
+            **Endpoint sécurisé** - Récupère tous les brouillons de l'utilisateur connecté.
+            
+            ### Authentification requise :
+            - 🔐 **JWT Bearer Token** obligatoire
+            - 👤 **Rôles autorisés** : EDITEUR, ADMINISTRATEUR
+            
+            ### Caractéristiques :
+            - 📄 **Paginé** : Support pagination complète
+            - 📝 **Brouillons uniquement** : Statut DRAFT
+            - 👤 **Personnel** : Seuls vos propres brouillons
+            """,
+        tags = {"Articles", "Personnel"},
+        security = @SecurityRequirement(name = "BearerAuth")
+    )
+    public ResponseEntity<Page<ArticleResponse>> getMyDrafts(
+        @Parameter(
+            description = "Configuration de pagination et tri",
+            schema = @Schema(implementation = Pageable.class)
+        )
+        @PageableDefault(size = 10, sort = "updatedAt", direction = Sort.Direction.DESC)
+        Pageable pageable
+    ) {
+        Page<ArticleResponse> myDrafts = articleFacade.getMyDrafts(pageable);
+        return ResponseEntity.ok(myDrafts);
+    }
+
+    // ===============================================
     // ENDPOINTS SÉCURISÉS (ÉDITEURS + ADMINS)
     // ===============================================
     
@@ -369,7 +443,7 @@ public class ArticleController {
      * Endpoint sécurisé réservé aux éditeurs et administrateurs.
      */
     @PostMapping
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     @Operation(
         summary = "Crée un nouvel article",
         description = """
@@ -472,7 +546,7 @@ public class ArticleController {
      * Endpoint sécurisé avec validation des droits d'auteur.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     @Operation(
         summary = "Met à jour un article existant",
         description = """
@@ -576,7 +650,7 @@ public class ArticleController {
      * Endpoint sécurisé pour la gestion du workflow éditorial.
      */
     @PostMapping("/{id}/publish")
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     @Operation(
         summary = "Publie un article en brouillon",
         description = """
@@ -660,7 +734,7 @@ public class ArticleController {
      * Endpoint sécurisé pour la gestion du cycle de vie des articles.
      */
     @PostMapping("/{id}/archive")
-    @PreAuthorize("hasRole('EDITEUR') or hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('EDITOR') or hasRole('ADMIN')")
     @Operation(
         summary = "Archive un article publié",
         description = """
@@ -746,7 +820,7 @@ public class ArticleController {
      * Endpoint sécurisé réservé aux administrateurs uniquement.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
         summary = "Supprime définitivement un article",
         description = """

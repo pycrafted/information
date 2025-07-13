@@ -1,282 +1,596 @@
-import React, { useState } from 'react'
-import { useAppSelector } from '../store'
-import { selectAuthUser, selectIsAuthenticated, selectUserRole } from '../store/authSlice'
-import { Navigate } from 'react-router-dom'
-import UserManagement from '../components/admin/UserManagement'
-import { Button } from '../components/ui/Button'
+import { useState, useEffect } from 'react';
+import { useAuth, usePermissions } from '../contexts/AuthContext';
+import { 
+  type User, 
+  type UserFormData,
+  type UserStats,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getUserStats,
+  formatRole,
+  formatDate
+} from '../services/userService';
+import UserForm from '../components/UserForm';
 
-/**
- * Page d'administration complète
- * 
- * Fonctionnalités :
- * - Gestion des utilisateurs (CRUD complet)
- * - Dashboard avec statistiques
- * - Audit logs
- * - Configuration système
- * 
- * Accessible uniquement aux ADMINISTRATEURS
- */
+type ViewMode = 'dashboard' | 'users' | 'create' | 'edit';
 
-type TabType = 'users' | 'dashboard' | 'audit' | 'settings';
+function AdminPage() {
+  const { user } = useAuth();
+  const { isAdmin } = usePermissions();
+  
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-export const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
-  const user = useAppSelector(selectAuthUser)
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const userRole = useAppSelector(selectUserRole)
+  // Redirection si non admin
+  useEffect(() => {
+    if (!isAdmin) {
+      console.log('🚫 Accès admin refusé - redirection nécessaire');
+    }
+  }, [isAdmin]);
 
-  // Redirection si pas admin
-  if (!isAuthenticated || userRole !== 'ADMINISTRATEUR') {
-    return <Navigate to="/login" replace />
+  // Charger les données
+  useEffect(() => {
+    if (isAdmin) {
+      fetchData();
+    }
+  }, [isAdmin]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [usersData, statsData] = await Promise.all([
+        getUsers(),
+        getUserStats()
+      ]);
+      
+      setUsers(usersData);
+      setStats(statsData);
+      console.log(`✅ ${usersData.length} utilisateurs et statistiques chargés`);
+    } catch (err: any) {
+      console.error('❌ Erreur lors du chargement des données admin:', err);
+      setError(err.message || 'Erreur lors du chargement des données');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Créer un utilisateur
+  const handleCreateUser = async (formData: UserFormData) => {
+    try {
+      setActionLoading('create');
+      setError(null);
+      
+      const newUser = await createUser(formData);
+      
+      setSuccess(`Utilisateur "${newUser.username}" créé avec succès !`);
+      setViewMode('users');
+      await fetchData();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la création de l\'utilisateur');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Modifier un utilisateur
+  const handleUpdateUser = async (formData: UserFormData) => {
+    if (!currentUser) return;
+    
+    try {
+      setActionLoading('update');
+      setError(null);
+      
+      const updatedUser = await updateUser(currentUser.id, formData);
+      
+      setSuccess(`Utilisateur "${updatedUser.username}" modifié avec succès !`);
+      setViewMode('users');
+      setCurrentUser(null);
+      await fetchData();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la modification de l\'utilisateur');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Supprimer un utilisateur
+  const handleDeleteUser = async (userToDelete: User) => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userToDelete.username}" ?\n\nCette action désactivera le compte de façon permanente.`)) {
+      return;
+    }
+    
+    try {
+      setActionLoading(`delete-${userToDelete.id}`);
+      setError(null);
+      
+      await deleteUser(userToDelete.id);
+      
+      setSuccess(`Utilisateur "${userToDelete.username}" supprimé avec succès !`);
+      await fetchData();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la suppression de l\'utilisateur');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const clearMessages = () => {
+    setError(null);
+    setSuccess(null);
+  };
+
+  const filteredUsers = users.filter(u =>
+    u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (!isAdmin) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '60vh',
+        backgroundColor: '#f8f9fa',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '5em', marginBottom: '20px' }}>🚫</div>
+        <h1 style={{ color: '#666', margin: '0 0 10px 0' }}>Accès refusé</h1>
+        <p style={{ color: '#999', marginBottom: '30px' }}>
+          Vous devez être administrateur pour accéder à cette page.
+        </p>
+        <a 
+          href="/"
+          style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '4px'
+          }}
+        >
+          🏠 Retour à l'accueil
+        </a>
+      </div>
+    );
   }
 
-  const tabs = [
-    { id: 'dashboard' as TabType, name: 'Tableau de bord', icon: '📊' },
-    { id: 'users' as TabType, name: 'Utilisateurs', icon: '👥' },
-    { id: 'audit' as TabType, name: 'Audit', icon: '📝' },
-    { id: 'settings' as TabType, name: 'Paramètres', icon: '⚙️' },
-  ]
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '60vh'
+      }}>
+        <div style={{ fontSize: '3em', marginBottom: '20px' }}>⏳</div>
+        <h2 style={{ color: '#666', margin: '0' }}>Chargement de l'administration...</h2>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        
-        {/* En-tête */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-          <p className="text-gray-600 mt-2">
-            Panneau de contrôle pour la gestion de la plateforme
-          </p>
-        </div>
+    <div style={{ 
+      padding: '20px',
+      width: '100%',
+      margin: '0',
+      backgroundColor: '#1a1a1a',
+      minHeight: '100vh'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: '30px' }}>
+        <h1 style={{ 
+          margin: '0 0 8px 0', 
+          color: '#fff',
+          fontSize: '2em'
+        }}>
+          👑 Administration
+        </h1>
+        <p style={{ 
+          margin: '0', 
+          color: '#999',
+          fontSize: '1em'
+        }}>
+          Bienvenue {user?.username} - Gestion complète du système
+        </p>
+      </div>
 
-        {/* Navigation par onglets */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="mr-2">{tab.icon}</span>
-                  {tab.name}
-                </button>
-              ))}
-            </nav>
+      {/* Messages */}
+      {(error || success) && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '4px',
+          marginBottom: '20px',
+          backgroundColor: error ? '#dc3545' : '#28a745',
+          color: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>{error || success}</span>
+          <button
+            onClick={clearMessages}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '1.2em'
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        marginBottom: '30px',
+        flexWrap: 'wrap'
+      }}>
+        {[
+          { key: 'dashboard', label: '📊 Tableau de bord', icon: '📊' },
+          { key: 'users', label: '👥 Utilisateurs', icon: '👥' },
+          { key: 'create', label: '➕ Nouvel utilisateur', icon: '➕' }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => {
+              setViewMode(tab.key as ViewMode);
+              setCurrentUser(null);
+              clearMessages();
+            }}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '4px',
+              border: 'none',
+              backgroundColor: viewMode === tab.key ? '#007bff' : '#333',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (viewMode !== tab.key) {
+                e.currentTarget.style.backgroundColor = '#555';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (viewMode !== tab.key) {
+                e.currentTarget.style.backgroundColor = '#333';
+              }
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenu principal */}
+      {viewMode === 'dashboard' && (
+        <div>
+          <h2 style={{ color: '#fff', marginBottom: '20px' }}>📊 Tableau de bord</h2>
+          
+          {/* Statistiques */}
+          {stats && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '20px',
+              marginBottom: '30px'
+            }}>
+              <div style={{
+                backgroundColor: '#333',
+                padding: '20px',
+                borderRadius: '8px',
+                border: '1px solid #444'
+              }}>
+                <div style={{ fontSize: '2em', marginBottom: '8px' }}>👥</div>
+                <div style={{ color: '#fff', fontSize: '1.5em', fontWeight: 'bold' }}>
+                  {stats.totalUsers}
+                </div>
+                <div style={{ color: '#999', fontSize: '0.9em' }}>
+                  Utilisateurs total
+                </div>
+              </div>
+
+              <div style={{
+                backgroundColor: '#333',
+                padding: '20px',
+                borderRadius: '8px',
+                border: '1px solid #444'
+              }}>
+                <div style={{ fontSize: '2em', marginBottom: '8px' }}>✅</div>
+                <div style={{ color: '#28a745', fontSize: '1.5em', fontWeight: 'bold' }}>
+                  {stats.activeUsers}
+                </div>
+                <div style={{ color: '#999', fontSize: '0.9em' }}>
+                  Comptes actifs
+                </div>
+              </div>
+
+              <div style={{
+                backgroundColor: '#333',
+                padding: '20px',
+                borderRadius: '8px',
+                border: '1px solid #444'
+              }}>
+                <div style={{ fontSize: '2em', marginBottom: '8px' }}>❌</div>
+                <div style={{ color: '#dc3545', fontSize: '1.5em', fontWeight: 'bold' }}>
+                  {stats.inactiveUsers}
+                </div>
+                <div style={{ color: '#999', fontSize: '0.9em' }}>
+                  Comptes inactifs
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions rapides */}
+          <div style={{
+            backgroundColor: '#333',
+            padding: '24px',
+            borderRadius: '8px',
+            border: '1px solid #444'
+          }}>
+            <h3 style={{ color: '#fff', marginBottom: '16px' }}>Actions rapides</h3>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setViewMode('users')}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9em'
+                }}
+              >
+                👥 Gérer les utilisateurs
+              </button>
+              <button
+                onClick={() => setViewMode('create')}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9em'
+                }}
+              >
+                ➕ Créer un utilisateur
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Contenu des onglets */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          {activeTab === 'dashboard' && <DashboardContent />}
-          {activeTab === 'users' && <UserManagement />}
-          {activeTab === 'audit' && <AuditContent />}
-          {activeTab === 'settings' && <SettingsContent />}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Composant Dashboard
-const DashboardContent: React.FC = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-6">Tableau de bord</h2>
-    
-    {/* Statistiques */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <StatCard
-        title="Total Utilisateurs"
-        value="156"
-        icon="👥"
-        trend="+12%"
-        trendPositive={true}
-      />
-      <StatCard
-        title="Articles Publiés"
-        value="1,248"
-        icon="📰"
-        trend="+8%"
-        trendPositive={true}
-      />
-      <StatCard
-        title="Catégories"
-        value="24"
-        icon="📂"
-        trend="+2"
-        trendPositive={true}
-      />
-      <StatCard
-        title="Connexions Aujourd'hui"
-        value="89"
-        icon="🔐"
-        trend="-3%"
-        trendPositive={false}
-      />
-    </div>
-
-    {/* Actions rapides */}
-    <div className="mb-8">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Actions rapides</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <QuickActionCard
-          title="Nouvel Utilisateur"
-          description="Créer un nouveau compte utilisateur"
-          icon="➕"
-          onClick={() => console.log('Créer utilisateur')}
-        />
-        <QuickActionCard
-          title="Voir les Logs"
-          description="Consulter les journaux d'audit"
-          icon="📋"
-          onClick={() => console.log('Voir logs')}
-        />
-        <QuickActionCard
-          title="Paramètres"
-          description="Configurer la plateforme"
-          icon="⚙️"
-          onClick={() => console.log('Paramètres')}
-        />
-      </div>
-    </div>
-
-    {/* Graphique de tendance (placeholder) */}
-    <div className="mb-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Activité récente</h3>
-      <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <div className="text-4xl mb-2">📈</div>
-          <p>Graphique d'activité</p>
-          <p className="text-sm">(À implémenter avec Chart.js)</p>
-        </div>
-      </div>
-    </div>
-  </div>
-)
-
-// Composant de statistique
-const StatCard: React.FC<{
-  title: string
-  value: string
-  icon: string
-  trend: string
-  trendPositive: boolean
-}> = ({ title, value, icon, trend, trendPositive }) => (
-  <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-600">{title}</p>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
-      </div>
-      <div className="text-3xl">{icon}</div>
-    </div>
-    <div className="mt-4">
-      <span className={`text-sm ${trendPositive ? 'text-green-600' : 'text-red-600'}`}>
-        {trend}
-      </span>
-      <span className="text-sm text-gray-500 ml-1">vs mois dernier</span>
-    </div>
-  </div>
-)
-
-// Composant d'action rapide
-const QuickActionCard: React.FC<{
-  title: string
-  description: string
-  icon: string
-  onClick: () => void
-}> = ({ title, description, icon, onClick }) => (
-  <div 
-    className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-all cursor-pointer hover:border-blue-300"
-    onClick={onClick}
-  >
-    <div className="text-3xl mb-4">{icon}</div>
-    <h4 className="text-lg font-medium text-gray-900 mb-2">{title}</h4>
-    <p className="text-gray-600 text-sm">{description}</p>
-  </div>
-)
-
-// Composant Audit
-const AuditContent: React.FC = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-6">Journaux d'audit</h2>
-    
-    <div className="bg-gray-100 rounded-lg p-8 text-center">
-      <div className="text-4xl mb-4">📝</div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">Logs d'audit</h3>
-      <p className="text-gray-600 mb-4">
-        Fonctionnalité à implémenter : affichage des logs d'activité
-      </p>
-      <Button variant="outline">
-        Implémenter les logs
-      </Button>
-    </div>
-  </div>
-)
-
-// Composant Paramètres
-const SettingsContent: React.FC = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-6">Paramètres</h2>
-    
-    <div className="space-y-6">
-      {/* Paramètres généraux */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Configuration générale</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nom de la plateforme
-            </label>
+      {viewMode === 'users' && (
+        <div>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <h2 style={{ color: '#fff', margin: '0' }}>👥 Gestion des utilisateurs</h2>
+            
+            {/* Recherche */}
             <input
               type="text"
-              defaultValue="News Platform"
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
+              placeholder="🔍 Rechercher un utilisateur..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '4px',
+                border: '1px solid #444',
+                backgroundColor: '#333',
+                color: '#fff',
+                fontSize: '0.9em',
+                minWidth: '250px'
+              }}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email administrateur
-            </label>
-            <input
-              type="email"
-              defaultValue="admin@newsplatform.com"
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            />
-          </div>
-        </div>
-        <Button className="mt-4">
-          Sauvegarder
-        </Button>
-      </div>
 
-      {/* Paramètres de sécurité */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Sécurité</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Authentification à deux facteurs</p>
-              <p className="text-sm text-gray-600">Activer la 2FA pour tous les admins</p>
-            </div>
-            <input type="checkbox" className="h-4 w-4" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Audit des connexions</p>
-              <p className="text-sm text-gray-600">Enregistrer toutes les tentatives de connexion</p>
-            </div>
-            <input type="checkbox" defaultChecked className="h-4 w-4" />
+          {/* Tableau des utilisateurs */}
+          <div style={{
+            backgroundColor: '#333',
+            borderRadius: '8px',
+            border: '1px solid #444',
+            overflow: 'hidden'
+          }}>
+            {filteredUsers.length === 0 ? (
+              <div style={{
+                padding: '40px',
+                textAlign: 'center',
+                color: '#999'
+              }}>
+                {searchTerm ? 
+                  `Aucun utilisateur trouvé pour "${searchTerm}"` : 
+                  'Aucun utilisateur trouvé'
+                }
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#444' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#fff', fontSize: '0.9em' }}>
+                        Utilisateur
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#fff', fontSize: '0.9em' }}>
+                        Email
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#fff', fontSize: '0.9em' }}>
+                        Rôle
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#fff', fontSize: '0.9em' }}>
+                        Statut
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#fff', fontSize: '0.9em' }}>
+                        Dernière connexion
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'center', color: '#fff', fontSize: '0.9em' }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((u) => (
+                      <tr
+                        key={u.id}
+                        style={{
+                          borderBottom: '1px solid #444',
+                          backgroundColor: u.active ? 'transparent' : '#2a1f1f'
+                        }}
+                      >
+                        <td style={{ padding: '12px' }}>
+                          <div>
+                            <div style={{ color: '#fff', fontWeight: '500' }}>
+                              {u.username}
+                            </div>
+                            {(u.firstName || u.lastName) && (
+                              <div style={{ color: '#999', fontSize: '0.8em' }}>
+                                {u.firstName} {u.lastName}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px', color: '#ccc', fontSize: '0.9em' }}>
+                          {u.email}
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '0.9em' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: u.role === 'ADMINISTRATEUR' ? '#dc3545' : 
+                                            u.role === 'EDITEUR' ? '#fd7e14' : '#6c757d',
+                            color: 'white',
+                            fontSize: '0.8em'
+                          }}>
+                            {formatRole(u.role)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '0.9em' }}>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: u.active ? '#28a745' : '#dc3545',
+                            color: 'white',
+                            fontSize: '0.8em'
+                          }}>
+                            {u.active ? '✅ Actif' : '❌ Inactif'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: '#ccc', fontSize: '0.9em' }}>
+                          {formatDate(u.lastLogin)}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => {
+                                setCurrentUser(u);
+                                setViewMode('edit');
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.8em'
+                              }}
+                            >
+                              ✏️ Modifier
+                            </button>
+                            {u.id !== user?.id && (
+                              <button
+                                onClick={() => handleDeleteUser(u)}
+                                disabled={actionLoading === `delete-${u.id}`}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: actionLoading === `delete-${u.id}` ? '#666' : '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: actionLoading === `delete-${u.id}` ? 'not-allowed' : 'pointer',
+                                  fontSize: '0.8em'
+                                }}
+                              >
+                                {actionLoading === `delete-${u.id}` ? '⏳' : '🗑️'} Supprimer
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
+
+      {viewMode === 'create' && (
+        <div>
+          <h2 style={{ color: '#fff', marginBottom: '20px' }}>➕ Créer un nouvel utilisateur</h2>
+          <UserForm
+            onSubmit={handleCreateUser}
+            onCancel={() => setViewMode('users')}
+            isLoading={actionLoading === 'create'}
+            submitLabel="Créer l'utilisateur"
+          />
+        </div>
+      )}
+
+      {viewMode === 'edit' && currentUser && (
+        <div>
+          <h2 style={{ color: '#fff', marginBottom: '20px' }}>
+            ✏️ Modifier {currentUser.username}
+          </h2>
+          <UserForm
+            user={currentUser}
+            onSubmit={handleUpdateUser}
+            onCancel={() => {
+              setViewMode('users');
+              setCurrentUser(null);
+            }}
+            isLoading={actionLoading === 'update'}
+            submitLabel="Sauvegarder les modifications"
+          />
+        </div>
+      )}
     </div>
-  </div>
-)
+  );
+}
 
-export default AdminPage 
+export default AdminPage; 

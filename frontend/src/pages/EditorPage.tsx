@@ -1,414 +1,544 @@
-import React, { useState } from 'react'
-import { useAppSelector, selectAuth } from '../store'
-import { Navigate } from 'react-router-dom'
-import EditorDashboard from '../components/editor/EditorDashboard'
-import { Button } from '../components/ui/Button'
+import { useState, useEffect } from 'react';
+import { useAuth, usePermissions } from '../contexts/AuthContext';
+import { 
+  type Article, 
+  type ArticleFormData,
+  getMyArticles,
+  createArticle,
+  updateArticle,
+  publishArticle,
+  archiveArticle,
+  deleteArticle,
+  getStatusBadgeStyle,
+  getStatusLabel,
+  formatDate
+} from '../services/articleService';
+import ArticleForm from '../components/ArticleForm';
 
-/**
- * Page d'édition complète pour les éditeurs
- * 
- * Fonctionnalités :
- * - Dashboard avec statistiques
- * - Gestion des articles (CRUD complet)
- * - Workflow éditorial (DRAFT → PUBLISHED → ARCHIVED)
- * - Gestion des catégories
- * 
- * Accessible aux EDITEUR et ADMINISTRATEUR
- */
+type ViewMode = 'list' | 'create' | 'edit';
 
-type TabType = 'dashboard' | 'articles' | 'drafts' | 'create' | 'categories';
+function EditorPage() {
+  const { user } = useAuth();
+  const { isEditor, isAdmin, canDeleteArticles } = usePermissions();
+  
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [currentArticle, setCurrentArticle] = useState<Article | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'ALL' | 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('ALL');
 
-export const EditorPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
-  const { user, isAuthenticated } = useAppSelector(selectAuth)
+  // Charger les articles
+  useEffect(() => {
+    fetchMyArticles();
+  }, [filter]);
 
-  // Redirection si pas éditeur ou admin
-  if (!isAuthenticated || !['EDITEUR', 'ADMINISTRATEUR'].includes(user?.role || '')) {
-    return <Navigate to="/login" replace />
+  const fetchMyArticles = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Note: Pour l'instant, on récupère tous les articles publiés et on filtre côté client
+      // Il faudra adapter quand l'endpoint /my-articles sera disponible
+      const response = await getMyArticles(
+        filter === 'ALL' ? undefined : filter,
+        0,
+        50
+      );
+      
+      setArticles(response.content);
+      console.log(`✅ ${response.content.length} articles chargés`);
+    } catch (err: any) {
+      console.error('❌ Erreur lors du chargement des articles:', err);
+      setError(err.message || 'Erreur lors du chargement des articles');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Créer un article
+  const handleCreateArticle = async (formData: ArticleFormData) => {
+    try {
+      setActionLoading('create');
+      setError(null);
+      
+      const newArticle = await createArticle(formData);
+      
+      setSuccess(`Article "${newArticle.title}" créé avec succès !`);
+      setViewMode('list');
+      await fetchMyArticles();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la création de l\'article');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Modifier un article
+  const handleUpdateArticle = async (formData: ArticleFormData) => {
+    if (!currentArticle) return;
+
+    try {
+      setActionLoading('update');
+      setError(null);
+      
+      const updatedArticle = await updateArticle(currentArticle.id, formData, currentArticle);
+      
+      setSuccess(`Article "${updatedArticle.title}" modifié avec succès !`);
+      setViewMode('list');
+      setCurrentArticle(null);
+      await fetchMyArticles();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la modification de l\'article');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Publier un article
+  const handlePublishArticle = async (article: Article) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir publier l'article "${article.title}" ?`)) {
+      return;
+    }
+
+    try {
+      setActionLoading(`publish-${article.id}`);
+      setError(null);
+      
+      await publishArticle(article.id);
+      
+      setSuccess(`Article "${article.title}" publié avec succès !`);
+      await fetchMyArticles();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la publication');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Archiver un article
+  const handleArchiveArticle = async (article: Article) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir archiver l'article "${article.title}" ?`)) {
+      return;
+    }
+
+    try {
+      setActionLoading(`archive-${article.id}`);
+      setError(null);
+      
+      await archiveArticle(article.id);
+      
+      setSuccess(`Article "${article.title}" archivé avec succès !`);
+      await fetchMyArticles();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de l\'archivage');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Supprimer un article (admin seulement)
+  const handleDeleteArticle = async (article: Article) => {
+    if (!window.confirm(`⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir supprimer DÉFINITIVEMENT l'article "${article.title}" ?\n\nCette action est irréversible !`)) {
+      return;
+    }
+
+    try {
+      setActionLoading(`delete-${article.id}`);
+      setError(null);
+      
+      await deleteArticle(article.id);
+      
+      setSuccess(`Article "${article.title}" supprimé définitivement !`);
+      await fetchMyArticles();
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la suppression');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Effacer les messages
+  const clearMessages = () => {
+    setError(null);
+    setSuccess(null);
+  };
+
+  // Interface selon le mode
+  if (viewMode === 'create') {
+    return (
+      <div style={{ width: '100%', padding: '20px' }}>
+        <ArticleForm
+          onSubmit={handleCreateArticle}
+          onCancel={() => {
+            setViewMode('list');
+            clearMessages();
+          }}
+          isLoading={actionLoading === 'create'}
+          submitLabel="📝 Créer l'article"
+        />
+      </div>
+    );
   }
 
-  const tabs = [
-    { id: 'dashboard' as TabType, name: 'Tableau de bord', icon: '📊' },
-    { id: 'articles' as TabType, name: 'Mes Articles', icon: '📰' },
-    { id: 'drafts' as TabType, name: 'Brouillons', icon: '📝' },
-    { id: 'create' as TabType, name: 'Créer', icon: '✏️' },
-    { id: 'categories' as TabType, name: 'Catégories', icon: '📂' },
-  ]
+  if (viewMode === 'edit' && currentArticle) {
+    return (
+      <div style={{ width: '100%', padding: '20px' }}>
+        <ArticleForm
+          article={currentArticle}
+          onSubmit={handleUpdateArticle}
+          onCancel={() => {
+            setViewMode('list');
+            setCurrentArticle(null);
+            clearMessages();
+          }}
+          isLoading={actionLoading === 'update'}
+          submitLabel="✅ Sauvegarder les modifications"
+        />
+      </div>
+    );
+  }
 
+  // Vue liste (par défaut)
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        
-        {/* En-tête */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Espace Éditeur</h1>
-          <p className="text-gray-600 mt-2">
-            Créez et gérez vos contenus éditoriaux
+    <div style={{ width: '100%', padding: '20px' }}>
+      {/* En-tête */}
+      <div style={{ marginBottom: '30px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+          <div>
+            <h1 style={{ fontSize: '2.2em', color: '#333', margin: '0 0 5px 0' }}>
+              ✏️ Mes Articles
+            </h1>
+            <p style={{ color: '#666', margin: '0' }}>
+              Gérez vos articles • Connecté en tant que <strong>{user?.username}</strong> ({user?.role})
+            </p>
+          </div>
+          
+          <button
+            onClick={() => {
+              setViewMode('create');
+              clearMessages();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 20px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '1em',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#218838';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#28a745';
+            }}
+          >
+            📝 Nouvel Article
+          </button>
+        </div>
+
+        {/* Filtres */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <span style={{ color: '#666', fontSize: '0.9em' }}>Filtrer :</span>
+          {(['ALL', 'DRAFT', 'PUBLISHED', 'ARCHIVED'] as const).map((filterOption) => (
+            <button
+              key={filterOption}
+              onClick={() => setFilter(filterOption)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: filter === filterOption ? '#007bff' : 'transparent',
+                color: filter === filterOption ? 'white' : '#007bff',
+                border: '1px solid #007bff',
+                borderRadius: '4px',
+                fontSize: '0.8em',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {filterOption === 'ALL' ? '📄 Tous' : getStatusLabel(filterOption)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Messages */}
+      {error && (
+        <div style={{
+          backgroundColor: '#f8d7da',
+          border: '1px solid #f5c6cb',
+          color: '#721c24',
+          padding: '12px',
+          borderRadius: '4px',
+          marginBottom: '20px'
+        }}>
+          <strong>❌ Erreur :</strong> {error}
+          <button
+            onClick={clearMessages}
+            style={{
+              float: 'right',
+              background: 'none',
+              border: 'none',
+              color: '#721c24',
+              cursor: 'pointer'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div style={{
+          backgroundColor: '#d4edda',
+          border: '1px solid #c3e6cb',
+          color: '#155724',
+          padding: '12px',
+          borderRadius: '4px',
+          marginBottom: '20px'
+        }}>
+          <strong>✅ Succès :</strong> {success}
+          <button
+            onClick={clearMessages}
+            style={{
+              float: 'right',
+              background: 'none',
+              border: 'none',
+              color: '#155724',
+              cursor: 'pointer'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Liste des articles */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div style={{ fontSize: '3em', marginBottom: '15px' }}>🔄</div>
+          <h3 style={{ color: '#666' }}>Chargement de vos articles...</h3>
+        </div>
+      ) : articles.length === 0 ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '60px',
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0'
+        }}>
+          <div style={{ fontSize: '4em', marginBottom: '20px' }}>📝</div>
+          <h3 style={{ color: '#666', marginBottom: '15px' }}>
+            {filter === 'ALL' ? 'Aucun article trouvé' : `Aucun article ${getStatusLabel(filter).toLowerCase()}`}
+          </h3>
+          <p style={{ color: '#999', marginBottom: '25px' }}>
+            Commencez par créer votre premier article !
           </p>
+          <button
+            onClick={() => setViewMode('create')}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '1em',
+              cursor: 'pointer'
+            }}
+          >
+            📝 Créer mon premier article
+          </button>
         </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '15px' }}>
+          {articles.map((article) => (
+            <div
+              key={article.id}
+              style={{
+                backgroundColor: 'white',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                padding: '20px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <h3 style={{ margin: '0', fontSize: '1.3em', color: '#333' }}>
+                      {article.title}
+                    </h3>
+                    <span
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.7em',
+                        fontWeight: 'bold',
+                        ...getStatusBadgeStyle(article.publishedAt ? 'PUBLISHED' : 'DRAFT')
+                      }}
+                    >
+                      {getStatusLabel(article.publishedAt ? 'PUBLISHED' : 'DRAFT')}
+                    </span>
+                  </div>
+                  
+                  <p style={{ 
+                    color: '#666', 
+                    margin: '0 0 10px 0', 
+                    lineHeight: '1.5',
+                    maxHeight: '3em',
+                    overflow: 'hidden'
+                  }}>
+                    {article.summary || article.content.substring(0, 150) + '...'}
+                  </p>
+                  
+                  <div style={{ fontSize: '0.8em', color: '#999' }}>
+                    📁 {article.categoryName} • 📅 {formatDate(article.publishedAt || article.createdAt || '')} • 🆔 {article.id.substring(0, 8)}
+                  </div>
+                </div>
 
-        {/* Navigation par onglets */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 overflow-x-auto">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="mr-2">{tab.icon}</span>
-                  {tab.name}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '20px' }}>
+                  {/* Modifier - seulement pour les brouillons */}
+                  {!article.publishedAt ? (
+                    <button
+                      onClick={() => {
+                        setCurrentArticle(article);
+                        setViewMode('edit');
+                        clearMessages();
+                      }}
+                      disabled={!!actionLoading}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '0.8em',
+                        cursor: actionLoading ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      ✏️ Modifier
+                    </button>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '0.8em',
+                        cursor: 'not-allowed',
+                        opacity: 0.6
+                      }}
+                      title="Les articles publiés ne peuvent pas être modifiés"
+                    >
+                      🔒 Non modifiable
+                    </div>
+                  )}
 
-        {/* Contenu des onglets */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          {activeTab === 'dashboard' && <EditorDashboard />}
-          {activeTab === 'articles' && <ArticlesContent />}
-          {activeTab === 'drafts' && <DraftsContent />}
-          {activeTab === 'create' && <CreateArticleContent />}
-          {activeTab === 'categories' && <CategoriesContent />}
-        </div>
-      </div>
-    </div>
-  )
-}
+                  {/* Publier */}
+                  {/* Si publishedAt est null/undefined, c'est un brouillon */}
+                  {!article.publishedAt && (
+                    <button
+                      onClick={() => handlePublishArticle(article)}
+                      disabled={actionLoading === `publish-${article.id}` || !!actionLoading}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '0.8em',
+                        cursor: actionLoading ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {actionLoading === `publish-${article.id}` ? '🔄' : '📢'} Publier
+                    </button>
+                  )}
 
-// Composant Articles
-const ArticlesContent: React.FC = () => (
-  <div className="p-6">
-    <div className="flex justify-between items-center mb-6">
-      <h2 className="text-2xl font-bold text-gray-900">Mes Articles</h2>
-      <Button onClick={() => console.log('Nouvel article')}>
-        + Nouvel Article
-      </Button>
-    </div>
-    
-    {/* Filtres */}
-    <div className="flex space-x-4 mb-6">
-      <select className="border border-gray-300 rounded-md px-3 py-2">
-        <option>Tous les statuts</option>
-        <option>Brouillon</option>
-        <option>Publié</option>
-        <option>Archivé</option>
-      </select>
-      <select className="border border-gray-300 rounded-md px-3 py-2">
-        <option>Toutes les catégories</option>
-        <option>Technologie</option>
-        <option>Science</option>
-        <option>Culture</option>
-      </select>
-      <input
-        type="text"
-        placeholder="Rechercher un article..."
-        className="border border-gray-300 rounded-md px-3 py-2 flex-1"
-      />
-    </div>
+                  {/* Archiver */}
+                  {/* Si publishedAt existe, c'est un article publié */}
+                  {article.publishedAt && (
+                    <button
+                      onClick={() => handleArchiveArticle(article)}
+                      disabled={actionLoading === `archive-${article.id}` || !!actionLoading}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '0.8em',
+                        cursor: actionLoading ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {actionLoading === `archive-${article.id}` ? '🔄' : '📦'} Archiver
+                    </button>
+                  )}
 
-    {/* Liste des articles */}
-    <div className="space-y-4">
-      {[
-        {
-          id: '1',
-          title: 'Guide complet de TypeScript en 2024',
-          status: 'PUBLISHED',
-          category: 'Technologie',
-          views: 1247,
-          publishedAt: '2024-01-15',
-        },
-        {
-          id: '2',
-          title: 'Les nouveautés de React 19',
-          status: 'DRAFT',
-          category: 'Développement',
-          views: 0,
-          createdAt: '2024-01-20',
-        },
-        {
-          id: '3',
-          title: 'Intelligence Artificielle et éthique',
-          status: 'PUBLISHED',
-          category: 'Science',
-          views: 892,
-          publishedAt: '2024-01-10',
-        },
-      ].map((article) => (
-        <ArticleRow key={article.id} article={article} />
-      ))}
-    </div>
-
-    {/* Pagination */}
-    <div className="flex justify-center mt-8">
-      <div className="flex space-x-2">
-        <Button variant="outline" size="sm">Précédent</Button>
-        <Button variant="outline" size="sm">1</Button>
-        <Button size="sm">2</Button>
-        <Button variant="outline" size="sm">3</Button>
-        <Button variant="outline" size="sm">Suivant</Button>
-      </div>
-    </div>
-  </div>
-)
-
-// Composant Brouillons
-const DraftsContent: React.FC = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-6">Brouillons</h2>
-    
-    <div className="space-y-4">
-      {[
-        {
-          id: '2',
-          title: 'Les nouveautés de React 19',
-          category: 'Développement',
-          lastModified: '2024-01-20',
-          progress: 75,
-        },
-        {
-          id: '4',
-          title: 'Début d\'article sur l\'IA',
-          category: 'Science',
-          lastModified: '2024-01-18',
-          progress: 25,
-        },
-      ].map((draft) => (
-        <DraftCard key={draft.id} draft={draft} />
-      ))}
-    </div>
-
-    {/* Empty state si pas de brouillons */}
-    <div className="text-center py-12 text-gray-500">
-      <div className="text-4xl mb-4">📝</div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun brouillon</h3>
-      <p className="mb-4">Commencez à rédiger votre prochain article</p>
-      <Button>Créer un article</Button>
-    </div>
-  </div>
-)
-
-// Composant Création d'article
-const CreateArticleContent: React.FC = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-6">Créer un Article</h2>
-    
-    <form className="space-y-6 max-w-4xl">
-      {/* Titre */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Titre de l'article *
-        </label>
-        <input
-          type="text"
-          placeholder="Un titre accrocheur pour votre article..."
-          className="w-full border border-gray-300 rounded-md px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {/* Slug (URL) */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          URL de l'article (slug)
-        </label>
-        <div className="flex">
-          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">
-            /article/
-          </span>
-          <input
-            type="text"
-            placeholder="guide-typescript-2024"
-            className="flex-1 border border-gray-300 rounded-r-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      {/* Catégorie et statut */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Catégorie *
-          </label>
-          <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option>Sélectionner une catégorie</option>
-            <option>Technologie</option>
-            <option>Science</option>
-            <option>Culture</option>
-            <option>Sport</option>
-          </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Statut
-          </label>
-          <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="DRAFT">Brouillon</option>
-            <option value="PUBLISHED">Publié</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Résumé */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Résumé de l'article
-        </label>
-        <textarea
-          rows={3}
-          placeholder="Un court résumé qui donnera envie de lire votre article..."
-          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {/* Contenu */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Contenu de l'article *
-        </label>
-        <div className="border border-gray-300 rounded-md">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-300">
-            <div className="flex space-x-2 text-sm">
-              <button type="button" className="p-1 hover:bg-gray-200 rounded">📝</button>
-              <button type="button" className="p-1 hover:bg-gray-200 rounded">🔗</button>
-              <button type="button" className="p-1 hover:bg-gray-200 rounded">📷</button>
-              <button type="button" className="p-1 hover:bg-gray-200 rounded">📋</button>
+                  {/* Supprimer (admin seulement) */}
+                  {canDeleteArticles && (
+                    <button
+                      onClick={() => handleDeleteArticle(article)}
+                      disabled={actionLoading === `delete-${article.id}` || !!actionLoading}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '0.8em',
+                        cursor: actionLoading ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {actionLoading === `delete-${article.id}` ? '🔄' : '🗑️'} Supprimer
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-          <textarea
-            rows={15}
-            placeholder="Rédigez votre article ici... Vous pouvez utiliser Markdown pour la mise en forme."
-            className="w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 resize-none"
-          />
+          ))}
         </div>
-        <p className="text-sm text-gray-500 mt-2">
-          Support Markdown : **gras**, *italique*, [lien](url), etc.
+      )}
+
+      {/* Info et règles métier */}
+      <div style={{
+        marginTop: '40px',
+        textAlign: 'center',
+        padding: '20px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px',
+        fontSize: '0.9em',
+        color: '#666'
+      }}>
+        <p style={{ margin: '0 0 10px 0' }}>
+          🚀 Étape 6 : Gestion des articles • 
+          {isEditor && ' ✏️ Éditeur : Créer, modifier, publier articles •'}
+          {isAdmin && ' 👑 Admin : + Supprimer articles •'}
+          📊 {articles.length} article{articles.length !== 1 ? 's' : ''} affiché{articles.length !== 1 ? 's' : ''}
         </p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end space-x-4">
-        <Button variant="outline" type="button">
-          Prévisualiser
-        </Button>
-        <Button variant="outline" type="button">
-          Sauvegarder en brouillon
-        </Button>
-        <Button type="submit">
-          Publier l'article
-        </Button>
-      </div>
-    </form>
-  </div>
-)
-
-// Composant Catégories
-const CategoriesContent: React.FC = () => (
-  <div className="p-6">
-    <div className="flex justify-between items-center mb-6">
-      <h2 className="text-2xl font-bold text-gray-900">Gestion des Catégories</h2>
-      <Button>+ Nouvelle Catégorie</Button>
-    </div>
-    
-    <div className="bg-gray-100 rounded-lg p-8 text-center">
-      <div className="text-4xl mb-4">📂</div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">Gestion hiérarchique</h3>
-      <p className="text-gray-600 mb-4">
-        Interface pour gérer l'arborescence des catégories
-      </p>
-      <Button variant="outline">
-        Implémenter l'arbre des catégories
-      </Button>
-    </div>
-  </div>
-)
-
-// Composant ligne d'article
-const ArticleRow: React.FC<{
-  article: {
-    id: string;
-    title: string;
-    status: string;
-    category: string;
-    views: number;
-    publishedAt?: string;
-    createdAt?: string;
-  };
-}> = ({ article }) => {
-  const statusColors = {
-    PUBLISHED: 'bg-green-100 text-green-800',
-    DRAFT: 'bg-yellow-100 text-yellow-800',
-    ARCHIVED: 'bg-gray-100 text-gray-800',
-  };
-
-  return (
-    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-      <div className="flex-1">
-        <div className="flex items-center space-x-3 mb-2">
-          <h3 className="font-medium text-gray-900">{article.title}</h3>
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[article.status as keyof typeof statusColors]}`}>
-            {article.status}
-          </span>
+        <div style={{ 
+          fontSize: '0.8em', 
+          color: '#888',
+          fontStyle: 'italic',
+          borderTop: '1px solid #e0e0e0',
+          paddingTop: '10px',
+          marginTop: '10px'
+        }}>
+          📝 <strong>Règles métier :</strong> Les brouillons peuvent être modifiés et publiés. 
+          Les articles publiés peuvent être archivés mais ne sont plus modifiables.
         </div>
-        <div className="flex items-center space-x-4 text-sm text-gray-500">
-          <span>📂 {article.category}</span>
-          <span>👁️ {article.views} vues</span>
-          <span>📅 {article.publishedAt || article.createdAt}</span>
-        </div>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Button variant="ghost" size="sm">Modifier</Button>
-        <Button variant="ghost" size="sm">Dupliquer</Button>
-        <Button variant="ghost" size="sm">⋮</Button>
       </div>
     </div>
   );
-};
+}
 
-// Composant carte de brouillon
-const DraftCard: React.FC<{
-  draft: {
-    id: string;
-    title: string;
-    category: string;
-    lastModified: string;
-    progress: number;
-  };
-}> = ({ draft }) => (
-  <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-    <div className="flex items-center justify-between mb-3">
-      <h3 className="font-medium text-gray-900">{draft.title}</h3>
-      <span className="text-sm text-gray-500">{draft.lastModified}</span>
-    </div>
-    
-    {/* Barre de progression */}
-    <div className="mb-3">
-      <div className="flex justify-between text-sm text-gray-600 mb-1">
-        <span>Progression</span>
-        <span>{draft.progress}%</span>
-      </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
-        <div 
-          className="bg-blue-600 h-2 rounded-full"
-          style={{ width: `${draft.progress}%` }}
-        />
-      </div>
-    </div>
-    
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-gray-500">📂 {draft.category}</span>
-      <div className="flex space-x-2">
-        <Button variant="ghost" size="sm">Continuer</Button>
-        <Button variant="outline" size="sm">Publier</Button>
-      </div>
-    </div>
-  </div>
-)
-
-export default EditorPage 
+export default EditorPage; 

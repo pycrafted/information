@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * Composant de configuration responsable du nettoyage automatique des logs au démarrage.
  * 
+ * TEMPORAIREMENT DÉSACTIVÉ pour éviter les problèmes de démarrage.
  * Ce composant fait partie de la couche Configuration et :
  * - S'exécute automatiquement au démarrage de l'application
  * - Nettoie les logs existants pour éviter l'accumulation
@@ -23,8 +24,9 @@ import org.springframework.stereotype.Component;
  * @version 1.0
  * @since 2024
  */
-@Component
-@Order(1) // Priorité élevée pour s'exécuter tôt dans le processus de démarrage
+// TEMPORAIREMENT DÉSACTIVÉ - Décommenter quand le problème de démarrage sera résolu
+// @Component
+// @Order(1) // Priorité élevée pour s'exécuter tôt dans le processus de démarrage
 public class LogCleanupRunner implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(LogCleanupRunner.class);

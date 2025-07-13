@@ -25,15 +25,6 @@ docker-compose up -d db
 echo "⏳ Waiting for database to initialise …"
 sleep 10
 
-# --- Frontend ----------------------------------------------------------------
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "⚠️  pnpm not found – installing globally via npm …"
-  npm install -g pnpm
-fi
-
-echo "🎨 Installing frontend dependencies …"
-( cd frontend && pnpm install )
-
 # --- Backend -----------------------------------------------------------------
 echo "📦 Building backend …"
 ( cd backend && ./gradlew build -x test )
@@ -45,7 +36,5 @@ docker-compose up -d
 # --- Done --------------------------------------------------------------------
 
 echo "✅ Development environment ready!"
-echo "🌐 Frontend: http://localhost:3000"
 echo "🔧 Backend:   http://localhost:8080"
 echo "📚 API Docs:  http://localhost:8080/swagger-ui.html"
-echo "📚 API Docs: http://localhost:8080/swagger-ui.html"

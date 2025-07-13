@@ -37,23 +37,26 @@ public class TokenService {
 
     private final AuthTokenRepository authTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final TokenCleanupService tokenCleanupService;
     private SecretKey secretKey;
     
     // Configuration JWT depuis application.yml
     @Value("${jwt.secret:defaultSecretKeyForDevelopmentOnly1234567890}")
     private String jwtSecret;
     
-    @Value("${jwt.access-token.expiration:3600}") // 1 heure par défaut
+    @Value("${jwt.expiration:86400000}") // 24 heures par défaut (en millisecondes)
     private long accessTokenExpiration;
     
-    @Value("${jwt.refresh-token.expiration:604800}") // 7 jours par défaut
+    @Value("${jwt.refresh-expiration:604800000}") // 7 jours par défaut (en millisecondes)
     private long refreshTokenExpiration;
 
     @Autowired
     public TokenService(AuthTokenRepository authTokenRepository, 
-                       RefreshTokenRepository refreshTokenRepository) {
+                       RefreshTokenRepository refreshTokenRepository,
+                       TokenCleanupService tokenCleanupService) {
         this.authTokenRepository = authTokenRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.tokenCleanupService = tokenCleanupService;
     }
 
     /**
@@ -94,7 +97,7 @@ public class TokenService {
                     .claim("role", user.getRole().name())
                     .claim("roleDescription", user.getRole().getDescription())
                     .setIssuedAt(new Date())
-                    .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpiration * 1000))
+                    .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
                     .signWith(secretKey, SignatureAlgorithm.HS512)
                     .compact();
 
@@ -103,12 +106,14 @@ public class TokenService {
                 jwt, 
                 AuthToken.TokenType.ACCESS, 
                 user, 
-                LocalDateTime.now().plusSeconds(accessTokenExpiration)
+                LocalDateTime.now().plusSeconds(accessTokenExpiration / 1000)
             );
             authToken.setClientIp(clientIp);
             authToken.setUserAgent(userAgent);
 
-            return authTokenRepository.save(authToken);
+            AuthToken savedToken = authTokenRepository.save(authToken);
+            tokenCleanupService.cleanupDuplicateTokensForValue(savedToken.getTokenValue());
+            return savedToken;
 
         } catch (Exception e) {
             throw new BusinessException("Erreur lors de la génération du jeton d'accès", e);
@@ -139,12 +144,14 @@ public class TokenService {
             RefreshToken refreshToken = new RefreshToken(
                 tokenValue,
                 user,
-                LocalDateTime.now().plusSeconds(refreshTokenExpiration)
+                LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000)
             );
             refreshToken.setClientIp(clientIp);
             refreshToken.setUserAgent(userAgent);
 
-            return refreshTokenRepository.save(refreshToken);
+            RefreshToken savedToken = refreshTokenRepository.save(refreshToken);
+            tokenCleanupService.cleanupDuplicateTokensForValue(savedToken.getTokenValue());
+            return savedToken;
 
         } catch (Exception e) {
             throw new BusinessException("Erreur lors de la génération du refresh token", e);
@@ -168,8 +175,8 @@ public class TokenService {
                     .parseClaimsJws(tokenValue)
                     .getPayload();
 
-            // Recherche du jeton en base de données
-            Optional<AuthToken> authTokenOpt = authTokenRepository.findByTokenValue(tokenValue);
+            // Recherche du jeton en base de données avec utilisateur chargé
+            Optional<AuthToken> authTokenOpt = authTokenRepository.findByTokenValueWithUser(tokenValue);
             
             if (authTokenOpt.isPresent()) {
                 AuthToken authToken = authTokenOpt.get();
@@ -187,6 +194,59 @@ public class TokenService {
 
         } catch (JwtException | IllegalArgumentException e) {
             // Jeton JWT malformé ou signature invalide
+            return Optional.empty();
+        } catch (Exception e) {
+            // Gestion des doublons - essayer de nettoyer et récupérer
+            if (e.getMessage() != null && e.getMessage().contains("Query did not return a unique result")) {
+                return handleDuplicateTokens(tokenValue);
+            }
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Gère les tokens en double en nettoyant les doublons
+     */
+    @Transactional
+    private Optional<AuthToken> handleDuplicateTokens(String tokenValue) {
+        try {
+            List<AuthToken> duplicateTokens = authTokenRepository.findAllByTokenValueWithUser(tokenValue);
+            
+            if (duplicateTokens.isEmpty()) {
+                return Optional.empty();
+            }
+            
+            // Garder le token le plus récent et valide
+            AuthToken validToken = duplicateTokens.stream()
+                .filter(AuthToken::isValid)
+                .max((t1, t2) -> t1.getCreatedAt().compareTo(t2.getCreatedAt()))
+                .orElse(null);
+            
+            if (validToken == null) {
+                // Aucun token valide trouvé, supprimer tous les doublons
+                authTokenRepository.deleteAll(duplicateTokens);
+                return Optional.empty();
+            }
+            
+            // Supprimer les autres tokens (doublons)
+            List<AuthToken> tokensToDelete = duplicateTokens.stream()
+                .filter(token -> !token.getId().equals(validToken.getId()))
+                .toList();
+            
+            if (!tokensToDelete.isEmpty()) {
+                authTokenRepository.deleteAll(tokensToDelete);
+            }
+            
+            return Optional.of(validToken);
+            
+        } catch (Exception e) {
+            // En cas d'erreur, supprimer tous les tokens problématiques
+            try {
+                List<AuthToken> allTokens = authTokenRepository.findAllByTokenValue(tokenValue);
+                authTokenRepository.deleteAll(allTokens);
+            } catch (Exception cleanupError) {
+                // Ignorer les erreurs de nettoyage
+            }
             return Optional.empty();
         }
     }
@@ -248,6 +308,9 @@ public class TokenService {
         // Marquer le refresh token comme utilisé
         refreshToken.markAsUsed();
         refreshTokenRepository.save(refreshToken);
+
+        // Nettoyer les tokens en double pour ce refresh token
+        tokenCleanupService.cleanupDuplicateTokensForValue(refreshTokenValue);
 
         // Générer un nouveau jeton d'accès
         return generateAccessToken(refreshToken.getUser(), clientIp, userAgent);

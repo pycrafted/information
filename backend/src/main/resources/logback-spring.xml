@@ -5,17 +5,30 @@
     <property name="LOG_PATH" value="./logs"/>
     <property name="APP_NAME" value="newsplatform"/>
     
-    <!-- ===== PATTERNS DE LOG COMPATIBLES SPRING BOOT ===== -->
+    <!-- ===== PATTERNS DE LOG OPTIMISÉS ===== -->
+    <!-- Pattern console simplifié et coloré -->
     <property name="CONSOLE_LOG_PATTERN" 
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%15.15t] %-40.40logger{39} : %m%n"/>
+              value="%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan([%15.15t]) %green(%logger{36}) : %msg%n"/>
+    
+    <!-- Pattern console pour les connexions -->
+    <property name="AUTH_LOG_PATTERN" 
+              value="%d{HH:mm:ss.SSS} %highlight(%-5level) %yellow([AUTH]) %green(%logger{36}) : %msg%n"/>
     
     <property name="FILE_LOG_PATTERN" 
               value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
     
-    <!-- ===== APPENDER CONSOLE ===== -->
+    <!-- ===== APPENDER CONSOLE PRINCIPAL ===== -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- ===== APPENDER CONSOLE AUTHENTIFICATION ===== -->
+    <appender name="CONSOLE_AUTH" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${AUTH_LOG_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>
@@ -84,6 +97,22 @@
     
     <!-- ===== LOGGERS SPÉCIALISÉS ===== -->
     
+    <!-- Logger Authentification - AFFICHAGE CONSOLE PRIORITAIRE -->
+    <logger name="com.newsplatform.controller.rest.AuthController" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_AUTH"/>
+        <appender-ref ref="FILE_SECURITY"/>
+    </logger>
+    
+    <logger name="com.newsplatform.service.AuthService" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_AUTH"/>
+        <appender-ref ref="FILE_SECURITY"/>
+    </logger>
+    
+    <logger name="com.newsplatform.security.JwtAuthenticationFilter" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE_AUTH"/>
+        <appender-ref ref="FILE_SECURITY"/>
+    </logger>
+    
     <!-- Logger Performance -->
     <logger name="com.newsplatform.performance" level="INFO" additivity="false">
         <appender-ref ref="FILE_PERF"/>
@@ -96,15 +125,23 @@
         <appender-ref ref="CONSOLE"/>
     </logger>
     
-    <!-- Logger Spring Framework (limité) -->
+    <!-- Logger Spring Framework (RÉDUIT) -->
     <logger name="org.springframework" level="WARN" additivity="false">
-        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE_APP"/>
     </logger>
     
-    <!-- Logger Hibernate SQL (optionnel pour développement) -->
+    <!-- Logger Hibernate SQL (DÉSACTIVÉ pour console) -->
     <logger name="org.hibernate.SQL" level="WARN" additivity="false">
-        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE_APP"/>
+    </logger>
+    
+    <!-- Logger Tomcat (RÉDUIT) -->
+    <logger name="org.apache.tomcat" level="WARN" additivity="false">
+        <appender-ref ref="FILE_APP"/>
+    </logger>
+    
+    <!-- Logger HikariCP (RÉDUIT) -->
+    <logger name="com.zaxxer.hikari" level="WARN" additivity="false">
         <appender-ref ref="FILE_APP"/>
     </logger>
     
@@ -112,20 +149,20 @@
     
     <!-- Profil DÉVELOPPEMENT -->
     <springProfile name="dev">
-        <root level="INFO">
+        <root level="WARN">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE_APP"/>
             <appender-ref ref="FILE_ERROR"/>
         </root>
         
-        <!-- Logger application en mode DEBUG pour développement -->
-        <logger name="com.newsplatform" level="DEBUG" additivity="false">
+        <!-- Logger application en mode INFO pour développement -->
+        <logger name="com.newsplatform" level="INFO" additivity="false">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE_APP"/>
         </logger>
         
-        <!-- Plus de détails Spring en développement -->
-        <logger name="org.springframework" level="INFO" additivity="false">
+        <!-- Plus de détails Spring en développement (mais pas trop) -->
+        <logger name="org.springframework.web" level="INFO" additivity="false">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE_APP"/>
         </logger>
@@ -159,7 +196,7 @@
     
     <!-- Configuration par défaut (si aucun profil spécifique) -->
     <springProfile name="!dev,!prod,!test">
-        <root level="INFO">
+        <root level="WARN">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE_APP"/>
             <appender-ref ref="FILE_ERROR"/>

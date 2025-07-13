@@ -1,161 +1,49 @@
-# Cahier des Charges – Projet d’Architecture Logicielle
-
-## 1. Contexte et Objectif
-
-Ce projet vise à mettre en œuvre une architecture logicielle multicouche respectant les bonnes pratiques de développement logiciel enseignées dans le cours. Il s'agit de concevoir et développer un système complet d'actualités avec des services web et une application cliente. Le projet doit être conçu de manière modulaire, testable, maintenable et évolutive.
-
-## 2. Contraintes Générales
-
-- **Séparation stricte en 5 couches logiques** : 
-  - Présentation
-  - Contrôle
-  - Service
-  - Domaine
-  - Persistance
-
-- **Respect rigoureux des responsabilités de chaque couche.**
-- **Utilisation des Design Patterns recommandés** : MVC, DAO, etc.
-- **Respect total des principes SOLID et Clean Code.**
-- **Couplage faible entre les couches, haute cohésion.**
-- **Mise en place de tests unitaires et tests d’intégration.**
-- **Livraison du code sur un dépôt GitHub public.**
-
----
-
-## 3. Fonctionnalités attendues
-
-### 3.1 Site Web (Côté utilisateur)
-
-#### 🧾 Accueil
-- Affichage des derniers articles avec description sommaire
-- Pagination avec boutons "suivant" / "précédent"
-
-#### 📄 Consultation d’un article
-- Affichage détaillé au clic sur le titre
-
-#### 🗂 Affichage par catégories
-- Liste des articles filtrés par catégorie
-
-### 3.2 Gestion des utilisateurs selon leur rôle
-
-| Rôle | Accès |
-|------|-------|
-| **Visiteur** | Lecture uniquement |
-| **Éditeur** | CRUD Articles + Catégories |
-| **Administrateur** | CRUD Utilisateurs + gestion des jetons d’authentification |
-
----
-
-## 4. Services Web
-
-### 4.1 Services SOAP (Sécurisés par jeton)
-
-- Authentification d’un utilisateur (login + mot de passe)
-- Gestion des utilisateurs : lister, ajouter, modifier, supprimer
-
-### 4.2 Services REST
-
-- Obtenir tous les articles (format JSON ou XML)
-- Obtenir les articles groupés par catégorie
-- Obtenir les articles d'une catégorie donnée
-
----
-
-## 5. Application Client (Java ou Python)
-
-- Authentification via Web Service SOAP
-- Interface CLI ou GUI permettant :
-  - L’ajout, la modification, la suppression et la liste des utilisateurs
-- Appels sécurisés aux services web via jetons d’authentification
-
----
-
-## 6. Architecture en 5 couches
-
-### 6.1 Couche Présentation (Frontend ou IHM)
-- HTML/CSS/JS ou framework web
-- Interface CLI ou GUI pour l’application cliente
-- Ne contient aucune logique métier
-- Respecte le principe MVC
-
-### 6.2 Couche Contrôle (Contrôleurs)
-- Reçoit les requêtes utilisateur (HTTP ou GUI)
-- Valide les entrées
-- Appelle les services métiers appropriés
-- Gère les exceptions, sessions et droits d’accès
-
-### 6.3 Couche Service
-- Implémente la logique métier
-- Expose les cas d’utilisation
-- Gère la sécurité applicative
-- Orchestration des appels aux objets du domaine
-- Traite les conversions DTO ↔ Objet métier
-
-### 6.4 Couche Domaine
-- Contient les entités métier (Article, Catégorie, Utilisateur)
-- Contient les règles métier pures (ex : validation métier)
-- Entièrement indépendante des frameworks et technologies
-
-### 6.5 Couche Persistance
-- Gère l’accès aux données (JPA, JDBC, etc.)
-- Implémentation des DAO
-- Mapping Objet/Relationnel
-- Stockage en base ou fichier
-- Ne contient aucune logique métier
-
----
-
-## 7. Bonnes Pratiques à Respecter
-
-- Respect **strict du modèle en 5 couches**
-- **Pas de fuite de responsabilité entre les couches**
-- **Tests unitaires** : Couche Domaine et Service
-- **Tests d’intégration** : Services Web SOAP/REST
-- Respect des principes :
-  - **SOLID**
-  - **KISS** (Keep It Simple, Stupid)
-  - **DRY** (Don't Repeat Yourself)
-  - **YAGNI** (You Aren't Gonna Need It)
-
-- Documentation claire (Javadoc ou équivalent)
-- Convention de nommage uniforme
-- Gestion des erreurs centralisée
-- Utilisation de DTOs pour exposer les données
-
----
-
-## 8. Livraison attendue
-
-- Projet sur **GitHub public**
-- Structure claire avec séparation stricte des 5 couches
-- Dossier `tests` pour les tests unitaires et d’intégration
-- README.md documentant :
-  - L'architecture du projet
-  - Le mode de déploiement
-  - La documentation API (Swagger ou WSDL si SOAP)
-- Respect des deadlines et du format d’envoi par email
-
----
-
-## 9. Technologies recommandées
-
-- Backend : Spring Boot (Java) ou Flask/FastAPI (Python)
-- Frontend : React, Angular ou simple HTML/CSS/JS
-- BDD : PostgreSQL ou MySQL
-- SOAP : JAX-WS ou Zeep
-- REST : Spring REST ou Flask/DRF
-- Tests : JUnit / Pytest / Postman / SoapUI
-
----
-
-## 10. Rappel : Critères de Notation
-
-- Respect des **fonctionnalités demandées**
-- **Qualité de l’architecture** (5 couches)
-- **Clarté du code** et respect du clean code
-- **Complétude des tests**
-- **Documentation**
-- **Travail en équipe (max 3)**
-- **Livraison sur Git à temps**
-
----
+PROJET D’ARCHITECTURE LOGICIELLE
+NB : En plus des fonctionnalités applicatives, la qualité du code sera prise en compte dans la correction
+de ce travail. De même, il devra être envoyé au plus tard le [date_à_définir] à 23h59mn59s sur un
+compte Git accessible publiquement et dont le lien d’accès sera envoyé à envoitp@gmail.com. L’objet
+du mail devra être Projet_AL_Groupe_X_Classe, X étant le numéro du groupe et Classe faisant
+référence à la classe de l’étudiant (DIC2 ou MASTER1 ou DIT2). Chaque groupe devra être constitué
+d’au plus trois (3) étudiants. Le non-respect de ces contraintes rendra le travail irrecevable.
+Objectif du projet
+L’objectif de ce projet est de mettre en œuvre les compétences acquises dans le cours d’architecture
+logicielle. Il est découpé en trois parties que vous devrez faire intégralement.
+Site Web
+Il s’agira de concevoir un site d’actualité disposant des fonctionnalités suivantes :
+- La page d’accueil devra afficher la liste des derniers articles avec une description sommaire de
+chacun d’entre eux. Des boutons « suivant » et « précédent » devront permettre de parcourir
+les articles selon leur ancienneté.
+- Le clic sur le titre d’un article devra permettre de le consulter en détail.
+- On devrait avoir la possibilité de consulter les articles par catégorie.
+- Trois types de profils utilisateurs devront être pris en compte :
+ Les visiteurs simples : Ils peuvent accéder à toutes les fonctionnalités applicatives liées
+à la consultation des articles (affichage par catégorie, etc.)
+ Les éditeurs : Leur rôle est de maintenir le contenu du site. De ce fait, en plus de ce
+que peuvent faire les visiteurs, Ils ont la possibilité, après authentification, de gérer
+(lister, ajouter, supprimer ou modifier) les articles et les catégories.
+ Les administrateurs sont des éditeurs qui ont la possibilité de gérer les données des
+utilisateurs. Ainsi, ils ont accès à toutes les fonctionnalités applicatives et peuvent
+donc ajouter, lister, modifier ou supprimer des utilisateurs. De même, ils sont chargés
+de l’ajout et de la suppression des jetons d’authentification permettant d’accéder aux
+services web à accès restreint.
+Services Web
+En plus des fonctionnalités directement accessibles depuis un navigateur, l’application devra exposer
+un ensemble de services web afin que ses fonctionnalités métiers soient accessibles à d’autres
+applications. De ce fait, il vous est demandé de :
+- Créer un service web SOAP permettant de :
+ lister, ajouter, supprimer ou modifier des utilisateurs. L’accès à ce service requiert un
+jeton d’authentification qu’un administrateur devra au préalable générer depuis la
+page d’administration du site
+ D’authentifier un utilisateur suivant un login et un mot de passe fourni
+- Créer un service web REST permettant de :
+ Récupérer la liste de tous les articles. Cette liste devra être retournée au format XML
+ou JSON selon le choix de l’utilisateur.
+ récupérer la liste des articles regroupés en catégories (format XML ou JSON au choix)
+ récupérer la liste des articles appartenant à une catégorie fournie par l’utilisateur
+(format XML ou JSON au choix)
+Application Client
+Créer une application Java (ou Python) permettant de gérer les utilisateurs. Quand l’application est
+lancée, elle demande à l’utilisateur son login et son mot de passe et invoque ainsi le service web
+d’authentification pour voir si l’utilisateur a les droits d’administration lui permettant d’agir sur les
+utilisateurs. Le cas échéant, l’application devra fournir un accès complet aux fonctionnalités de gestion
+des utilisateurs et ce, en utilisant les services web adéquats.

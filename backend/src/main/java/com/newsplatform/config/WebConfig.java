@@ -3,7 +3,6 @@ package com.newsplatform.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -27,15 +26,6 @@ public class WebConfig implements WebMvcConfigurer {
             .mediaType("xml", MediaType.APPLICATION_XML);
     }
 
-    /**
-     * Configuration CORS pour les tests et le développement
-     */
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-            .allowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*")
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            .allowedHeaders("*")
-            .allowCredentials(true);
-    }
+    // Configuration CORS supprimée pour éviter les conflits avec SecurityConfig
+    // La configuration CORS est gérée dans SecurityConfig.corsConfigurationSource()
 }

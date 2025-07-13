@@ -32,13 +32,16 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final TokenService tokenService;
+    private final UserRepository userRepository;
 
     @Autowired
     public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
-                         JwtAuthenticationFilter jwtAuthenticationFilter) {
+                         TokenService tokenService,
+                         UserRepository userRepository) {
         this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.tokenService = tokenService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -102,7 +105,7 @@ public class SecurityConfig {
             );
 
         // Ajout du filtre JWT avant le filtre d'authentification par défaut
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new JwtAuthenticationFilter(tokenService, userRepository), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -119,8 +122,10 @@ public class SecurityConfig {
         
         // Autoriser les origines spécifiques du développement
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "http://127.0.0.1:*"
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000"
         ));
         
         // Autoriser toutes les méthodes HTTP

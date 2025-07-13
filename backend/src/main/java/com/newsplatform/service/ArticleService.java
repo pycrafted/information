@@ -289,6 +289,32 @@ public class ArticleService {
         }
     }
 
+    /**
+     * Récupère les articles d'un auteur avec un statut spécifique et pagination.
+     * 
+     * @param author auteur des articles
+     * @param status statut des articles
+     * @param pageable configuration de pagination
+     * @return page des articles de l'auteur avec le statut donné
+     */
+    @Transactional(readOnly = true)
+    public Page<Article> getArticlesByAuthorAndStatus(User author, ArticleStatus status, Pageable pageable) {
+        // Validation des paramètres
+        if (author == null) {
+            throw new ValidationException("L'auteur ne peut pas être null");
+        }
+        if (status == null) {
+            throw new ValidationException("Le statut ne peut pas être null");
+        }
+        validatePageable(pageable);
+        
+        try {
+            return articleRepository.findByAuthorAndStatus(author, status, pageable);
+        } catch (Exception e) {
+            throw new BusinessException("Erreur lors de la récupération des articles par auteur et statut", e);
+        }
+    }
+
     // ===============================================
     // OPÉRATIONS CRUD ET GESTION DES STATUTS
     // ===============================================
