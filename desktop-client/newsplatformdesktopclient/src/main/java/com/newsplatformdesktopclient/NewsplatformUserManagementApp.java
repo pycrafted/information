@@ -650,11 +650,140 @@ public class NewsplatformUserManagementApp extends Application {
             return;
         }
         
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Changer mot de passe");
-        alert.setHeaderText("Changement pour: " + user.getUsername());
-        alert.setContentText("Le changement de mot de passe via SOAP sera implémenté prochainement.");
-        alert.showAndWait();
+        // Créer un Dialog personnalisé pour le changement de mot de passe
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Changer mot de passe");
+        dialog.setHeaderText("Changement pour: " + user.getUsername());
+        
+        // Boutons OK et Cancel
+        ButtonType changeButtonType = new ButtonType("Changer", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(changeButtonType, ButtonType.CANCEL);
+        
+        // Création du formulaire
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+        
+        // Champs du formulaire
+        PasswordField newPasswordField = new PasswordField();
+        newPasswordField.setPromptText("Nouveau mot de passe");
+        
+        PasswordField confirmPasswordField = new PasswordField();
+        confirmPasswordField.setPromptText("Confirmer le nouveau mot de passe");
+        
+        Label strengthLabel = new Label();
+        strengthLabel.setStyle("-fx-text-fill: gray; -fx-font-size: 10px;");
+        
+        Label matchLabel = new Label();
+        matchLabel.setStyle("-fx-text-fill: gray; -fx-font-size: 10px;");
+        
+        // Assemblage du formulaire
+        grid.add(new Label("Nouveau mot de passe:"), 0, 0);
+        grid.add(newPasswordField, 1, 0);
+        grid.add(strengthLabel, 1, 1);
+        grid.add(new Label("Confirmer:"), 0, 2);
+        grid.add(confirmPasswordField, 1, 2);
+        grid.add(matchLabel, 1, 3);
+        
+        // Validation en temps réel
+        Button changeButton = (Button) dialog.getDialogPane().lookupButton(changeButtonType);
+        changeButton.setDisable(true);
+        
+        Runnable validateForm = () -> {
+            String newPassword = newPasswordField.getText();
+            String confirmPassword = confirmPasswordField.getText();
+            
+            // Validation de la force du mot de passe
+            boolean isPasswordValid = isValidPassword(newPassword);
+            if (newPassword.isEmpty()) {
+                strengthLabel.setText("");
+                strengthLabel.setStyle("-fx-text-fill: gray; -fx-font-size: 10px;");
+            } else if (isPasswordValid) {
+                strengthLabel.setText("✓ Mot de passe valide");
+                strengthLabel.setStyle("-fx-text-fill: green; -fx-font-size: 10px;");
+            } else {
+                strengthLabel.setText("✗ Minimum 8 caractères, incluant majuscules, minuscules et chiffres");
+                strengthLabel.setStyle("-fx-text-fill: red; -fx-font-size: 10px;");
+            }
+            
+            // Validation de la confirmation
+            boolean passwordsMatch = newPassword.equals(confirmPassword);
+            if (confirmPassword.isEmpty()) {
+                matchLabel.setText("");
+                matchLabel.setStyle("-fx-text-fill: gray; -fx-font-size: 10px;");
+            } else if (passwordsMatch) {
+                matchLabel.setText("✓ Mots de passe identiques");
+                matchLabel.setStyle("-fx-text-fill: green; -fx-font-size: 10px;");
+            } else {
+                matchLabel.setText("✗ Mots de passe différents");
+                matchLabel.setStyle("-fx-text-fill: red; -fx-font-size: 10px;");
+            }
+            
+            changeButton.setDisable(!isPasswordValid || !passwordsMatch || newPassword.isEmpty());
+        };
+        
+        // Écouter les changements pour validation
+        newPasswordField.textProperty().addListener((obs, oldVal, newVal) -> validateForm.run());
+        confirmPasswordField.textProperty().addListener((obs, oldVal, newVal) -> validateForm.run());
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        // Conversion du résultat
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == changeButtonType) {
+                return newPasswordField.getText();
+            }
+            return null;
+        });
+        
+        // Focus sur le premier champ
+        Platform.runLater(() -> newPasswordField.requestFocus());
+        
+        // Traitement du résultat
+        dialog.showAndWait().ifPresent(newPassword -> {
+            try {
+                // Appel SOAP pour changer le mot de passe
+                SOAPClientService soapService = new SOAPClientService();
+                boolean success = soapService.changeUserPassword(authToken, user.getId(), newPassword);
+                
+                if (success) {
+                    // Succès - Afficher message de succès
+                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                    successAlert.setTitle("Mot de passe changé");
+                    successAlert.setHeaderText("Succès");
+                    successAlert.setContentText("Le mot de passe de l'utilisateur '" + user.getUsername() + 
+                                              "' a été changé avec succès.");
+                    successAlert.showAndWait();
+                } else {
+                    // Échec - Afficher message d'erreur
+                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                    errorAlert.setTitle("Erreur");
+                    errorAlert.setHeaderText("Échec du changement");
+                    errorAlert.setContentText("Impossible de changer le mot de passe.");
+                    errorAlert.showAndWait();
+                }
+                
+            } catch (Exception e) {
+                // Gestion des erreurs
+                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                errorAlert.setTitle("Erreur de changement");
+                errorAlert.setHeaderText("Impossible de changer le mot de passe");
+                
+                String errorMessage = e.getMessage();
+                if (errorMessage.contains("authentication") || errorMessage.contains("token")) {
+                    errorAlert.setContentText("Session expirée. Veuillez vous reconnecter.");
+                } else if (errorMessage.contains("not found") || errorMessage.contains("inexistant")) {
+                    errorAlert.setContentText("L'utilisateur n'existe plus sur le serveur.");
+                } else if (errorMessage.contains("validation")) {
+                    errorAlert.setContentText("Le nouveau mot de passe ne respecte pas les critères de sécurité.");
+                } else {
+                    errorAlert.setContentText("Erreur: " + errorMessage);
+                }
+                
+                errorAlert.showAndWait();
+            }
+        });
     }
     
     /**
